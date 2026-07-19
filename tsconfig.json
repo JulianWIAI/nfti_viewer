@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    // Target modern browsers only — no IE11, no polyfills needed
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+
+    // DOM + Iterable for the main thread; WebWorker for the worker script
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    // Bundler-mode resolution lets Vite handle node_modules resolution
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+
+    // Required when using allowImportingTsExtensions
+    "noEmit": true,
+
+    "jsx": "react-jsx",
+
+    // Strict mode: catches the most common runtime errors at compile time
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}

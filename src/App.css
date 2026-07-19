@@ -1,0 +1,2416 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   App.css — Global styles for the NIfTI Viewer
+   Dark theme; colours chosen to match standard radiological workstation UX.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* ── Reset & base ──────────────────────────────────────────────────────────── */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* Palette */
+  --bg-app:        #0a0a0a;
+  --bg-panel:      #111111;
+  --bg-panel-alt:  #161616;
+  --bg-section:    #1e1e1e;
+  --border:        #2a2a2a;
+  --text-primary:  #e8e8e8;
+  --text-secondary:#8a8a8a;
+  --text-hint:     #555555;
+  --accent-green:  #00e676;   /* medical monitor green */
+  --accent-blue:   #40a9ff;
+  --accent-red:    #ff4d4f;
+  --accent-amber:  #faad14;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  /* Typography */
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --font-ui:   -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Sizes */
+  --panel-width: 280px;
+  --header-height: 44px;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── App shell ────────────────────────────────────────────────────────────── */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.app-header {
+  height: var(--header-height);
+  min-height: var(--header-height);
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-4);
+  gap: var(--space-4);
+  flex-shrink: 0;
+}
+
+.app-header h1 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--accent-green);
+}
+
+.app-header__badge {
+  font-size: 11px;
+  color: var(--text-hint);
+  font-family: var(--font-mono);
+}
+
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── vtk.js canvas container ─────────────────────────────────────────────── */
+
+.viewer-root {
+  flex: 1;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+
+.vtk-container {
+  flex: 1;
+  position: relative;
+  background: #000;
+  /* vtk.js appends a <canvas> as a direct child */
+}
+
+/* Make vtk.js canvas fill the container exactly */
+.vtk-container > canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ── Quadrant overlay labels ──────────────────────────────────────────────── */
+
+.quadrant-label {
+  position: absolute;
+  z-index: 10;
+  pointer-events: none;   /* don't interfere with vtk.js mouse events */
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--accent-green);
+  background: rgba(0, 0, 0, 0.45);
+  padding: 2px 6px;
+  border-radius: 2px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.quadrant-label--tl { top: 6px;        left: 6px; }
+.quadrant-label--tr { top: 6px;        left: calc(50% + 6px); }
+.quadrant-label--bl { top: calc(50% + 6px); left: 6px; }
+.quadrant-label--br { top: calc(50% + 6px); left: calc(50% + 6px); }
+
+/* ── Panel dividers (visual crosshair) ──────────────────────────────────── */
+
+.panel-divider {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  background: var(--border);
+}
+
+.panel-divider--h {
+  top: 50%;
+  left: 0; right: 0;
+  height: 2px;
+  transform: translateY(-50%);
+}
+
+.panel-divider--v {
+  left: 50%;
+  top: 0; bottom: 0;
+  width: 2px;
+  transform: translateX(-50%);
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+
+.empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: var(--text-hint);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+
+/* ── Right sidebar ─────────────────────────────────────────────────────────  */
+
+.sidebar {
+  width: var(--panel-width);
+  min-width: var(--panel-width);
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+/* ── FileUpload ──────────────────────────────────────────────────────────── */
+
+.file-upload-section {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.drop-zone {
+  border: 1.5px dashed var(--border);
+  border-radius: 6px;
+  padding: var(--space-5) var(--space-4);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+}
+
+.drop-zone:hover,
+.drop-zone--active {
+  border-color: var(--accent-green);
+  background: rgba(0, 230, 118, 0.04);
+}
+
+.drop-zone--loading {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.drop-zone__idle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+}
+
+.drop-zone__idle svg {
+  color: var(--text-hint);
+}
+
+.drop-zone__primary {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.drop-zone__secondary {
+  font-size: 12px;
+}
+
+.drop-zone__link {
+  color: var(--accent-blue);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.drop-zone__hint {
+  font-size: 11px;
+  color: var(--text-hint);
+  font-family: var(--font-mono);
+}
+
+.drop-zone__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-secondary);
+}
+
+/* Spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 2.5px solid var(--border);
+  border-top-color: var(--accent-green);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* File badge */
+.file-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--bg-section);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.file-badge__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  flex-shrink: 0;
+}
+
+.file-badge__name {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Error */
+.upload-error {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(255, 77, 79, 0.1);
+  border-left: 3px solid var(--accent-red);
+  border-radius: 0 4px 4px 0;
+  font-size: 12px;
+  color: #ff7875;
+  line-height: 1.5;
+}
+
+/* ── ControlPanel ────────────────────────────────────────────────────────── */
+
+.control-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: var(--space-6);
+}
+
+.panel-title {
+  padding: var(--space-4) var(--space-4) var(--space-2);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-hint);
+}
+
+.control-section {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.control-section--meta {
+  border-bottom: none;
+}
+
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-3);
+}
+
+.section-hint {
+  font-size: 11px;
+  color: var(--text-hint);
+  line-height: 1.6;
+  margin-bottom: var(--space-3);
+}
+
+.section-hint code {
+  background: var(--bg-section);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent-blue);
+}
+
+/* Slider rows */
+.control-row {
+  margin-bottom: var(--space-3);
+}
+
+.control-row--toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.control-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-1);
+}
+
+.control-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-primary);
+  min-width: 36px;
+  text-align: right;
+}
+
+.control-slider {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--bg-section);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.control-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.control-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+}
+
+.control-slider:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.control-slider:disabled::-webkit-slider-thumb {
+  cursor: not-allowed;
+}
+
+/* Checkbox */
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-green);
+  cursor: pointer;
+}
+
+input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+/* Buttons */
+.btn {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: opacity 0.15s, background 0.15s;
+  text-align: center;
+  margin-bottom: var(--space-2);
+  font-family: var(--font-ui);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn--primary {
+  background: var(--accent-green);
+  color: #000;
+}
+
+.btn--primary:not(:disabled):hover {
+  opacity: 0.85;
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+
+.btn--ghost:not(:disabled):hover {
+  background: var(--bg-section);
+  color: var(--text-primary);
+}
+
+/* Inference status indicator */
+.inference-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-3);
+  font-family: var(--font-mono);
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot--idle    { background: var(--text-hint); }
+.status-dot--running { background: var(--accent-amber); animation: pulse 1s infinite; }
+.status-dot--done    { background: var(--accent-green); }
+.status-dot--error   { background: var(--accent-red); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+/* Metadata list */
+.meta-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-3);
+}
+
+.meta-list dt {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.meta-list dd {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+/* ── Plugin workspace (canvas + sidebar, owned by each ViewerComponent) ─────── */
+
+.plugin-workspace {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── Welcome / empty landing page ────────────────────────────────────────── */
+
+.welcome-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-hint);
+}
+
+.welcome-state__inner {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.welcome-state__inner svg {
+  opacity: 0.35;
+}
+
+.welcome-state__inner h2 {
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.welcome-state__formats {
+  font-size: 12px;
+  color: var(--text-hint);
+  font-family: var(--font-mono);
+}
+
+/* ── EEG / fNIRS canvas viewer ───────────────────────────────────────────── */
+
+.ts-container {
+  flex: 1;
+  position: relative;
+  background: var(--bg-app);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.ts-canvas {
+  flex: 1;
+  display: block;
+  min-height: 0;
+}
+
+/* Timeline scrollbar at the bottom of the canvas viewer */
+.ts-scrollbar {
+  height: 10px;
+  background: var(--bg-section);
+  border-top: 1px solid var(--border);
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ts-scrollbar__thumb {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  background: var(--text-hint);
+  border-radius: 3px;
+  min-width: 12px;
+}
+
+.ts-scrollbar__thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* ── Channel list in TimeseriesControls / NirsControls ───────────────────── */
+
+.channel-list {
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--space-2);
+}
+
+.channel-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px var(--space-1);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.channel-item:hover {
+  background: var(--bg-section);
+}
+
+.channel-label {
+  flex: 1;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.channel-unit {
+  font-size: 10px;
+  color: var(--text-hint);
+  font-family: var(--font-mono);
+}
+
+.channel-list__empty {
+  font-size: 11px;
+  color: var(--text-hint);
+  padding: var(--space-2);
+}
+
+/* ── Small button variant ────────────────────────────────────────────────── */
+
+.btn--sm {
+  width: auto;
+  display: inline-block;
+  padding: 2px var(--space-2);
+  font-size: 11px;
+  margin-bottom: 0;
+}
+
+.btn--secondary {
+  background: var(--bg-section);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+.btn--secondary:not(:disabled):hover {
+  background: var(--bg-panel-alt);
+  border-color: var(--text-hint);
+}
+
+.btn--active {
+  background: var(--accent-green) !important;
+  color: #000 !important;
+  border-color: transparent !important;
+}
+
+/* Button row (for All/None and wavelength selector) */
+.control-row--buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
+/* ── TimeScrubber ─────────────────────────────────────────────────────────── */
+
+/*
+ * Temporal frame scrubber for the EEG source localisation overlay.
+ * Lives inside a .control-section in VolumetricControls.
+ */
+
+.time-scrubber {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Section label — same style as .section-title */
+.time-scrubber__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* Horizontal row: [play btn] [track] [counter] */
+.time-scrubber__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Play / Pause icon button */
+.time-scrubber__play {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-section);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  padding: 0;
+}
+
+.time-scrubber__play:hover {
+  background: var(--accent-green);
+  color: #000;
+  border-color: transparent;
+}
+
+/* Slider + fill bar wrapper — fills remaining row space */
+.time-scrubber__track {
+  flex: 1;
+  position: relative;
+  height: 16px;        /* tall enough to contain the thumb */
+  display: flex;
+  align-items: center;
+}
+
+/*
+ * Decorative fill bar — sits behind the native range input.
+ * Shows the played-through portion in accent green.
+ * pointer-events: none prevents it from intercepting mouse events meant for
+ * the slider thumb.
+ */
+.time-scrubber__fill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 4px;
+  border-radius: 2px 0 0 2px;
+  background: var(--accent-green);
+  opacity: 0.6;
+  pointer-events: none;
+  transition: width 0.05s linear;  /* subtle lag smooths rapid scrubbing visually */
+}
+
+/* Native range input — transparent track so the fill bar shows through */
+.time-scrubber__slider {
+  position: relative;
+  z-index: 1;          /* above the fill bar */
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--bg-section);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.time-scrubber__slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  cursor: pointer;
+  transition: transform 0.1s;
+  box-shadow: 0 0 0 2px rgba(0, 230, 118, 0.25);
+}
+
+.time-scrubber__slider::-webkit-slider-thumb:hover {
+  transform: scale(1.3);
+}
+
+.time-scrubber__slider::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent-green);
+  cursor: pointer;
+}
+
+/* Frame counter — monospaced, right-aligned, fixed width prevents layout shift */
+.time-scrubber__counter {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  min-width: 52px;      /* enough for "999 / 999" */
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ── DecodingTimeline ─────────────────────────────────────────────────────── */
+
+/*
+ * Lightweight SVG decoding time-course chart.
+ *
+ * Renders MVPA AUC scores over time with a playhead, threshold highlight, and
+ * click-to-seek.  All colour is CSS-variable-driven so it matches the dark
+ * theme without hardcoded hex values in the component.
+ *
+ * The threshold highlight is achieved with two <clipPath> elements in <defs>:
+ *   {uid}-plot   — constrains all drawing to the plot rectangle
+ *   {uid}-above  — clips to the rect above the threshold line
+ * The area path is drawn twice: once with --base opacity (full area) and once
+ * with --above opacity restricted to the above-threshold clip region.
+ */
+
+.decoding-timeline {
+  width: 100%;
+}
+
+/* SVG fills container width; height can be overridden by a parent rule. */
+.decoding-timeline__svg {
+  display: block;
+  width: 100%;
+  height: 180px;
+  /* overflow visible so tick labels outside the viewBox don't get clipped */
+  overflow: visible;
+  cursor: crosshair;
+}
+
+/* ── Grid & axes ─────────────────────────────────────────────────────────── */
+
+.decoding-timeline__grid-line {
+  stroke: var(--border);
+  stroke-width: 0.5;
+}
+
+.decoding-timeline__axis-line {
+  stroke: var(--text-hint);
+  stroke-width: 1;
+}
+
+.decoding-timeline__tick {
+  stroke: var(--text-hint);
+  stroke-width: 1;
+}
+
+.decoding-timeline__tick-label {
+  fill: var(--text-secondary);
+  font-size: 9px;
+  font-family: var(--font-mono);
+  text-anchor: middle;
+}
+
+/* Y-axis labels are right-aligned relative to the axis. */
+.decoding-timeline__tick-label--y {
+  text-anchor: end;
+  dominant-baseline: middle;
+}
+
+/* ── Reference lines ─────────────────────────────────────────────────────── */
+
+/* Chance level (0.5 AUC): dashed, muted — just a reference */
+.decoding-timeline__chance-line {
+  stroke: var(--text-hint);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+/* Threshold indicator: amber dashed — signals the meaningful cutoff */
+.decoding-timeline__threshold-line {
+  stroke: var(--accent-amber);
+  stroke-width: 1;
+  stroke-dasharray: 5 3;
+  opacity: 0.7;
+}
+
+/* ── Area fills ──────────────────────────────────────────────────────────── */
+
+/* Subtle base fill visible across the entire area under the score line */
+.decoding-timeline__area--base {
+  fill: var(--accent-green);
+  opacity: 0.06;
+}
+
+/*
+ * Brighter fill for the above-threshold region.
+ * This path is identical to --base but is clipped by {uid}-above, so only the
+ * portion whose pixel Y is above the threshold line remains visible.
+ */
+.decoding-timeline__area--above {
+  fill: var(--accent-green);
+  opacity: 0.22;
+}
+
+/* ±SD / SEM band behind the score line */
+.decoding-timeline__std-band {
+  fill: var(--accent-green);
+  opacity: 0.10;
+}
+
+/* ── Score line ──────────────────────────────────────────────────────────── */
+
+.decoding-timeline__line {
+  fill: none;
+  stroke: var(--accent-green);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* ── Playhead ────────────────────────────────────────────────────────────── */
+
+/* Vertical cursor line */
+.decoding-timeline__playhead line {
+  stroke: var(--text-primary);
+  stroke-width: 1;
+  opacity: 0.75;
+}
+
+/* Dot at the current score position */
+.decoding-timeline__playhead circle {
+  fill: var(--accent-green);
+  stroke: #000;
+  stroke-width: 1.5;
+}
+
+/* ── DecodingPanel ───────────────────────────────────────────────────────── */
+
+/*
+ * Neural decoding controls section inside VolumetricControls.
+ *
+ * Fits into the same 280 px sidebar as all other control sections.
+ * Uses the same control-section / section-title / btn / inference-status
+ * classes as the SynthSeg segmentation panel so the two sections are
+ * visually consistent.
+ *
+ * File pickers use a hidden native input + visible styled button pattern:
+ *   .decoding-panel__file-row   flex row per file
+ *   .decoding-panel__file-btn   styled trigger (shows extension as badge)
+ *   .decoding-panel__file-name  truncated filename text
+ *
+ * Number params use a 2-column grid:
+ *   .decoding-panel__params       outer grid container
+ *   .decoding-panel__param-field  label + input column
+ *   .decoding-panel__param-label  label text
+ *   .decoding-panel__param-input  compact number input
+ *
+ * Status / result:
+ *   .decoding-panel__status  row containing status-dot + text
+ *   .decoding-panel__error   red error text inside status row
+ *   .decoding-panel__meta    green summary text inside status row
+ *   .decoding-panel__divider thin rule separating form from chart block
+ *   .decoding-panel__summary dim metadata line beneath the chart
+ */
+
+/* ── File pickers ─────────────────────────────────────────────────────────── */
+
+/* One row per BrainVision file (.vhdr / .eeg / .vmrk) */
+.decoding-panel__file-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+/* Trigger button — compact, fixed width, shows the file extension label */
+.decoding-panel__file-btn {
+  flex-shrink: 0;
+  min-width: 44px;
+  padding: 2px var(--space-2);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  background: var(--bg-section);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.decoding-panel__file-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-hint);
+}
+
+/* Filename text — fills remaining row space; truncate long paths */
+.decoding-panel__file-name {
+  flex: 1;
+  min-width: 0;                 /* allow flex shrink below content size */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-hint);
+}
+
+/* Highlight filename once a file is selected (detected via JS title attr) */
+.decoding-panel__file-name:not([title=""]) {
+  color: var(--text-secondary);
+}
+
+/* ── Parameter grid ───────────────────────────────────────────────────────── */
+
+/* 2-column grid for the numeric parameters */
+.decoding-panel__params {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2) var(--space-2);
+  margin: var(--space-2) 0;
+}
+
+/* Each label + input column */
+.decoding-panel__param-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.decoding-panel__param-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-hint);
+}
+
+.decoding-panel__param-input {
+  width: 100%;
+  padding: 2px var(--space-1);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  background: var(--bg-section);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  outline: none;
+  /* Remove native number-input spinners — they clash with the compact layout */
+  -moz-appearance: textfield;
+}
+
+.decoding-panel__param-input::-webkit-inner-spin-button,
+.decoding-panel__param-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+}
+
+.decoding-panel__param-input:focus {
+  border-color: var(--text-secondary);
+}
+
+/* ── Status & results ─────────────────────────────────────────────────────── */
+
+/* Matches the .inference-status layout from the SynthSeg section */
+.decoding-panel__status {
+  margin-bottom: var(--space-2);
+}
+
+/* Red error text */
+.decoding-panel__error {
+  color: var(--accent-red);
+  font-size: 10px;
+}
+
+/* Green summary line (peak AUC / latency / duration) */
+.decoding-panel__meta {
+  color: var(--accent-green);
+  font-size: 10px;
+}
+
+/* ── Playback / chart block ───────────────────────────────────────────────── */
+
+/* Thin separator between the form controls and the scrubber + chart */
+.decoding-panel__divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: var(--space-3) 0 var(--space-2);
+}
+
+/* Dim dataset metadata line (epoch count, channel count, class balance) */
+.decoding-panel__summary {
+  margin-top: var(--space-2);
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: var(--text-hint);
+  text-align: center;
+}
+
+/* ── ConnectomePanel ─────────────────────────────────────────────────────── */
+
+/*
+ * 3-D connectome node-and-edge overlay controls in VolumetricControls.
+ * Shares the .control-section / .section-title / .control-slider / .btn
+ * system classes.  BEM block: .connectome-panel
+ *
+ * Slider groups:
+ *   .connectome-panel__slider-group   wrapper (label row + hint + range)
+ *   .connectome-panel__slider-label   flex row: name left, live value right
+ *   .connectome-panel__slider-hint    dim explanatory text line
+ *
+ * Stats + reset row:
+ *   .connectome-panel__stats-row      flex row between stats and reset button
+ *   .connectome-panel__stats          dim "N edges · M regions" text
+ *   .connectome-panel__reset-btn      small ghost reset button
+ *
+ * Divider:
+ *   .connectome-panel__divider        thin rule between sliders and node list
+ *
+ * Node list:
+ *   .connectome-panel__node-list      scrollable container (max-height 160px)
+ *   .connectome-panel__node-item      clickable button row per region
+ *   .connectome-panel__node-item--selected   highlighted selection
+ *   .connectome-panel__node-item--dimmed     below centrality threshold
+ *   .connectome-panel__node-swatch    4×4 colour square (SYNTHSEG palette)
+ *   .connectome-panel__node-name      anatomy label text
+ *   .connectome-panel__node-centrality betweenness % (right-aligned)
+ *
+ * Dossier card:
+ *   .connectome-panel__dossier            card container
+ *   .connectome-panel__dossier-header     name + tissue badge flex row
+ *   .connectome-panel__dossier-title      region name (bold)
+ *   .connectome-panel__dossier-badge      tissue class pill
+ *   .connectome-panel__dossier-badge--gm  warm-rose pill
+ *   .connectome-panel__dossier-badge--wm  near-white pill
+ *   .connectome-panel__dossier-badge--csf sky-blue pill
+ *   .connectome-panel__dossier-grid       2-column metric grid
+ *   .connectome-panel__dossier-metric     label + value column
+ *   .connectome-panel__dossier-metric-label  dim small-caps label
+ *   .connectome-panel__dossier-metric-value  mono value
+ *   .connectome-panel__dossier-coords     CoM coordinate row
+ */
+
+/* ── Slider groups ─────────────────────────────────────────────────────────── */
+
+.connectome-panel__slider-group {
+  margin-bottom: var(--space-3);
+}
+
+/* Flex row: filter name on the left, live value readout on the right */
+.connectome-panel__slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 2px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* Explanatory hint line beneath the slider label */
+.connectome-panel__slider-hint {
+  font-size: 9px;
+  color: var(--text-hint);
+  margin-bottom: var(--space-1);
+  line-height: 1.3;
+}
+
+/* ── Stats + reset row ─────────────────────────────────────────────────────── */
+
+.connectome-panel__stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.connectome-panel__stats {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: var(--text-hint);
+}
+
+/* Small ghost reset button — same height as the stats text */
+.connectome-panel__reset-btn {
+  padding: 1px var(--space-2);
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: var(--text-hint);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+}
+
+.connectome-panel__reset-btn:hover {
+  color: var(--text-secondary);
+  border-color: var(--text-hint);
+}
+
+/* ── Divider ───────────────────────────────────────────────────────────────── */
+
+.connectome-panel__divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: var(--space-2) 0;
+}
+
+/* ── Node list ─────────────────────────────────────────────────────────────── */
+
+/* Scrollable container — capped at 160px so it doesn't overwhelm the sidebar */
+.connectome-panel__node-list {
+  max-height: 160px;
+  overflow-y: auto;
+  /* Thin scrollbar on Webkit */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  margin-bottom: var(--space-2);
+}
+
+.connectome-panel__node-list::-webkit-scrollbar {
+  width: 4px;
+}
+.connectome-panel__node-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+/* Each node row is a full-width button for accessible click targeting */
+.connectome-panel__node-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: var(--space-2);
+  padding: 3px var(--space-1);
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.connectome-panel__node-item:hover {
+  background: var(--bg-section);
+}
+
+/* Highlighted row when selected (dossier is open for this node) */
+.connectome-panel__node-item--selected {
+  background: var(--bg-section);
+  outline: 1px solid var(--border);
+  outline-offset: -1px;
+}
+
+/* Dimmed row when the node is hidden by the centrality filter */
+.connectome-panel__node-item--dimmed {
+  opacity: 0.35;
+}
+
+/* 10×10px SYNTHSEG colour swatch */
+.connectome-panel__node-swatch {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+/* Anatomy name — fills remaining width, truncated with ellipsis */
+.connectome-panel__node-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+/* Betweenness percentage — right-aligned, mono, dim */
+.connectome-panel__node-centrality {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: var(--text-hint);
+}
+
+/* ── Node dossier card ─────────────────────────────────────────────────────── */
+
+.connectome-panel__dossier {
+  background: var(--bg-section);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: var(--space-2) var(--space-2);
+  margin-top: var(--space-1);
+}
+
+/* Name + tissue badge row */
+.connectome-panel__dossier-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+/* Region name — bold, slightly larger */
+.connectome-panel__dossier-title {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Tissue class pill */
+.connectome-panel__dossier-badge {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  border-radius: 3px;
+  color: #000;
+}
+
+.connectome-panel__dossier-badge--gm  { background: #e87d7d; }   /* warm rose */
+.connectome-panel__dossier-badge--wm  { background: #c8c8c8; }   /* light grey */
+.connectome-panel__dossier-badge--csf { background: #64aae0; }   /* sky blue  */
+
+/* 2-column metric grid */
+.connectome-panel__dossier-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-1) var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+/* Each metric: label above, value below */
+.connectome-panel__dossier-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* Small-caps dim label */
+.connectome-panel__dossier-metric-label {
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-hint);
+}
+
+/* Mono value */
+.connectome-panel__dossier-metric-value {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+/* CoM row — label + coordinates on one line */
+.connectome-panel__dossier-coords {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--border);
+}
+
+.connectome-panel__dossier-coords .connectome-panel__dossier-metric-label {
+  flex-shrink: 0;
+}
+
+.connectome-panel__dossier-coords .connectome-panel__dossier-metric-value {
+  font-size: 10px;
+}
+
+/* ── ConnectomeHeatmap ──────────────────────────────────────────────────────── */
+
+/* Outer wrapper — must be position: relative for the tooltip overlay */
+.connectome-heatmap {
+  position:   relative;
+  width:      100%;
+  /* Height is set by the parent control section; default here is a sensible fallback */
+  height:     340px;
+  overflow:   hidden;
+  border-radius: var(--radius-sm, 4px);
+  background: #141414;
+}
+
+/* The canvas fills the container; width/height attrs are set in JS (DPR-aware) */
+.connectome-heatmap__canvas {
+  display:  block;
+  width:    100%;
+  height:   100%;
+}
+
+/* ── Tooltip ──────────────────────────────────────────────────────────────────── */
+
+.heatmap-tooltip {
+  position:        absolute;
+  z-index:         10;
+  pointer-events:  none;
+
+  background:      rgba(24, 24, 24, 0.94);
+  border:          1px solid rgba(255, 255, 255, 0.12);
+  border-radius:   var(--radius-sm, 4px);
+  padding:         6px 8px;
+
+  display:         flex;
+  flex-direction:  column;
+  gap:             3px;
+
+  max-width:       220px;
+  white-space:     nowrap;
+  box-shadow:      0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.heatmap-tooltip__pair {
+  font-size:   10px;
+  color:       var(--text-secondary, #aaa);
+  line-height: 1.3;
+  white-space: normal;     /* allow wrapping for long region names */
+}
+
+.heatmap-tooltip__value {
+  font-size:   12px;
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+  color:       #00e676;    /* var(--accent-green) */
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════════
+ * Anomaly Panel (Deep Sweep)
+ * ──────────────────────────
+ * CSS block for AnomalyPanel.tsx.
+ *
+ * Class hierarchy (BEM — block = anomaly-panel):
+ *   .anomaly-panel                      Control section block
+ *   .anomaly-panel__hint                Dim multi-line hint paragraph
+ *   .anomaly-panel__status-text         Status label next to the dot
+ *   .anomaly-panel__error               Red error detail text
+ *   .anomaly-panel__count               Detected voxel count row
+ *   .anomaly-panel__count-dot           Small red circle glyph
+ *   .anomaly-panel__run-btn             Primary action button (full width)
+ *   .anomaly-panel__overlay-controls    Container shown after a successful run
+ *   .anomaly-panel__opacity-row         Opacity slider row
+ *   .anomaly-panel__opacity-slider      Slider styled with red accent
+ *   .anomaly-panel__clear-btn           Ghost "Clear Sweep" button
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Section block ─────────────────────────────────────────────────────────── */
+
+.anomaly-panel {
+  /* Inherits .control-section layout — no extra overrides needed. */
+}
+
+/* ── Hint text ─────────────────────────────────────────────────────────────── */
+
+.anomaly-panel__hint {
+  font-size:   9px;
+  color:       var(--text-hint, #555);
+  line-height: 1.4;
+  margin-bottom: var(--space-2, 6px);
+}
+
+.anomaly-panel__hint code {
+  font-family: var(--font-mono, monospace);
+  font-size:   8px;
+  color:       var(--text-secondary, #aaa);
+}
+
+/* ── Status label ──────────────────────────────────────────────────────────── */
+
+.anomaly-panel__status-text {
+  font-size: 11px;
+  color:     var(--text-secondary, #aaa);
+}
+
+/* ── Error detail ──────────────────────────────────────────────────────────── */
+
+.anomaly-panel__error {
+  font-size:    9px;
+  color:        var(--accent-red, #e05252);
+  margin-top:   2px;
+  margin-bottom: var(--space-2, 6px);
+  line-height:  1.4;
+  word-break:   break-word;
+}
+
+/* ── Anomaly voxel count ───────────────────────────────────────────────────── */
+
+.anomaly-panel__count {
+  display:     flex;
+  align-items: center;
+  gap:         6px;
+  font-size:   10px;
+  font-family: var(--font-mono, monospace);
+  color:       var(--text-secondary, #aaa);
+  margin:      var(--space-1, 3px) 0 var(--space-2, 6px);
+}
+
+/* Small red indicator circle next to the voxel count */
+.anomaly-panel__count-dot {
+  display:       inline-block;
+  width:         7px;
+  height:        7px;
+  border-radius: 50%;
+  background:    #e05252;   /* red — matches anomaly overlay colour */
+  flex-shrink:   0;
+}
+
+/* ── Primary run button ────────────────────────────────────────────────────── */
+
+.anomaly-panel__run-btn {
+  width:         100%;
+  margin-top:    var(--space-1, 3px);
+  margin-bottom: var(--space-3, 10px);
+}
+
+/* ── Post-detection controls wrapper ──────────────────────────────────────── */
+
+.anomaly-panel__overlay-controls {
+  display:        flex;
+  flex-direction: column;
+  gap:            var(--space-1, 3px);
+}
+
+/* ── Opacity slider row ────────────────────────────────────────────────────── */
+
+.anomaly-panel__opacity-row {
+  /* Inherits .control-row layout — label on left, value on right. */
+}
+
+/* Red accent track/thumb to reinforce the anomaly colour palette */
+.anomaly-panel__opacity-slider {
+  accent-color: #e05252;
+}
+
+.anomaly-panel__opacity-slider:disabled {
+  opacity: 0.4;
+}
+
+/* ── Clear button ──────────────────────────────────────────────────────────── */
+
+/* Ghost-style destructive button — same width as run button */
+.anomaly-panel__clear-btn {
+  width:      100%;
+  margin-top: var(--space-1, 3px);
+  font-size:  11px;
+  color:      var(--text-hint, #555);
+  border:     1px solid var(--border, #2a2a3a);
+  background: transparent;
+  padding:    4px 0;
+  border-radius: 4px;
+  cursor:     pointer;
+  transition: color 0.12s, border-color 0.12s;
+}
+
+.anomaly-panel__clear-btn:hover {
+  color:        var(--accent-red, #e05252);
+  border-color: var(--accent-red, #e05252);
+}
+
+/* ── Longitudinal Analysis panel ────────────────────────────────────────────── */
+
+/* ── Hint text with inline red/blue colour labels ──────────────────────────── */
+
+.longitudinal-panel__hint {
+  font-size:   10px;
+  color:       var(--text-hint, #555);
+  line-height: 1.5;
+  margin-bottom: var(--space-2, 8px);
+}
+
+.longitudinal-panel__hint-red {
+  color:       #e05252;
+  font-weight: 600;
+}
+
+.longitudinal-panel__hint-blue {
+  color:       #40a9ff;
+  font-weight: 600;
+}
+
+/* ── File input rows ────────────────────────────────────────────────────────── */
+
+.longitudinal-panel__file-row {
+  display:        flex;
+  flex-direction: column;
+  gap:            2px;
+  margin-bottom:  var(--space-2, 8px);
+}
+
+.longitudinal-panel__file-label {
+  font-size:  10px;
+  color:      var(--text-secondary, #8a8a8a);
+  font-weight: 500;
+}
+
+.longitudinal-panel__file-input {
+  font-size:   10px;
+  color:       var(--text-primary, #e8e8e8);
+  background:  var(--bg-section, #1e1e1e);
+  border:      1px solid var(--border, #2a2a2a);
+  border-radius: 3px;
+  padding:     3px 4px;
+  width:       100%;
+  cursor:      pointer;
+}
+
+.longitudinal-panel__file-input::file-selector-button {
+  background:  var(--bg-panel-alt, #161616);
+  color:       var(--text-secondary, #8a8a8a);
+  border:      1px solid var(--border, #2a2a2a);
+  border-radius: 3px;
+  padding:     2px 6px;
+  font-size:   10px;
+  cursor:      pointer;
+  margin-right: 6px;
+}
+
+.longitudinal-panel__file-name {
+  font-size:     9px;
+  color:         var(--text-hint, #555);
+  overflow:      hidden;
+  text-overflow: ellipsis;
+  white-space:   nowrap;
+  max-width:     100%;
+}
+
+/* ── Registration type selector ─────────────────────────────────────────────── */
+
+.longitudinal-panel__xform-row {
+  display:       flex;
+  align-items:   center;
+  gap:           var(--space-2, 8px);
+  margin-bottom: var(--space-2, 8px);
+}
+
+.longitudinal-panel__xform-label {
+  font-size:  10px;
+  color:      var(--text-secondary, #8a8a8a);
+  flex-shrink: 0;
+}
+
+.longitudinal-panel__xform-select {
+  flex:        1;
+  font-size:   10px;
+  color:       var(--text-primary, #e8e8e8);
+  background:  var(--bg-section, #1e1e1e);
+  border:      1px solid var(--border, #2a2a2a);
+  border-radius: 3px;
+  padding:     3px 4px;
+}
+
+.longitudinal-panel__xform-select:disabled {
+  opacity: 0.5;
+}
+
+/* ── Status text ────────────────────────────────────────────────────────────── */
+
+.longitudinal-panel__status-text {
+  font-size: 11px;
+  color:     var(--text-secondary, #8a8a8a);
+}
+
+/* ── Error message ──────────────────────────────────────────────────────────── */
+
+.longitudinal-panel__error {
+  font-size:     10px;
+  color:         var(--accent-red, #e05252);
+  margin-bottom: var(--space-1, 4px);
+  line-height:   1.4;
+  word-break:    break-word;
+}
+
+/* ── Voxel counts badge ─────────────────────────────────────────────────────── */
+
+.longitudinal-panel__counts {
+  display:       flex;
+  align-items:   center;
+  gap:           4px;
+  font-size:     10px;
+  color:         var(--text-secondary, #8a8a8a);
+  margin-bottom: var(--space-1, 4px);
+}
+
+/* Inline colour dots next to the counts */
+.longitudinal-panel__counts-red,
+.longitudinal-panel__counts-blue {
+  display:       inline-block;
+  width:         7px;
+  height:        7px;
+  border-radius: 50%;
+  flex-shrink:   0;
+}
+
+.longitudinal-panel__counts-red  { background: #e05252; }
+.longitudinal-panel__counts-blue { background: #40a9ff; }
+
+/* ── Primary compute button ─────────────────────────────────────────────────── */
+
+.longitudinal-panel__run-btn {
+  width:         100%;
+  margin-top:    var(--space-1, 3px);
+  margin-bottom: var(--space-3, 10px);
+}
+
+/* ── Post-detection controls wrapper ────────────────────────────────────────── */
+
+.longitudinal-panel__overlay-controls {
+  display:        flex;
+  flex-direction: column;
+  gap:            var(--space-1, 3px);
+}
+
+/* ── Opacity slider ─────────────────────────────────────────────────────────── */
+
+.longitudinal-panel__opacity-row {
+  /* Inherits .control-row layout — label on left, value on right. */
+}
+
+/* Purple accent — neutral midpoint between the blue (atrophy) and red (growth) ends. */
+.longitudinal-panel__opacity-slider {
+  accent-color: #7c3aed;
+}
+
+.longitudinal-panel__opacity-slider:disabled {
+  opacity: 0.4;
+}
+
+/* ── Blink Compare button ───────────────────────────────────────────────────── */
+
+.longitudinal-panel__blink-btn {
+  width:         100%;
+  margin-top:    var(--space-1, 3px);
+  font-size:     11px;
+  color:         var(--text-secondary, #8a8a8a);
+  border:        1px solid var(--border, #2a2a2a);
+  background:    transparent;
+  padding:       4px 0;
+  border-radius: 4px;
+  cursor:        pointer;
+  transition:    color 0.12s, border-color 0.12s, background 0.12s;
+}
+
+.longitudinal-panel__blink-btn:hover {
+  color:        var(--accent-blue, #40a9ff);
+  border-color: var(--accent-blue, #40a9ff);
+}
+
+/* Active state: blue background when blinking is running */
+.longitudinal-panel__blink-btn--active {
+  color:        var(--accent-blue, #40a9ff);
+  border-color: var(--accent-blue, #40a9ff);
+  background:   rgba(64, 169, 255, 0.10);
+}
+
+/* ── Clear button ───────────────────────────────────────────────────────────── */
+
+.longitudinal-panel__clear-btn {
+  width:         100%;
+  margin-top:    var(--space-1, 3px);
+  font-size:     11px;
+  color:         var(--text-hint, #555);
+  border:        1px solid var(--border, #2a2a2a);
+  background:    transparent;
+  padding:       4px 0;
+  border-radius: 4px;
+  cursor:        pointer;
+  transition:    color 0.12s, border-color 0.12s;
+}
+
+.longitudinal-panel__clear-btn:hover {
+  color:        var(--accent-red, #e05252);
+  border-color: var(--accent-red, #e05252);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+ * Dual Viewer — Inter-Subject SyN Comparison
+ * ────────────────────────────────────────────
+ * CSS for DualVolumetricViewer.tsx and DualViewerControls.tsx.
+ *
+ * Class hierarchy (BEM — block = dual-viewer):
+ *   .dual-viewer                          Outer flex root (panes + sidebar)
+ *   .dual-viewer__panes                   Side-by-side canvas area
+ *   .dual-viewer__pane                    Single pane wrapper (label + canvas)
+ *   .dual-viewer__pane-label              "Subject A" / "Subject B" overlay label
+ *   .dual-viewer__canvas                  vtk.js canvas container
+ *   .dual-viewer__canvas--right           Modifier: right pane (slightly tinted)
+ *   .dual-viewer__empty-hint              Placeholder shown before first SyN run
+ *   .dual-viewer__sidebar                 Right sidebar (fixed width)
+ *
+ * Controls block (block = dual-viewer-controls):
+ *   .dual-viewer-controls__section        Repeating control section
+ *   .dual-viewer-controls__hint           Dim hint paragraph
+ *   .dual-viewer-controls__file-row       File picker column
+ *   .dual-viewer-controls__file-label     Label above the file input
+ *   .dual-viewer-controls__file-input     <input type="file"> element
+ *   .dual-viewer-controls__file-name      Truncated filename beneath the input
+ *   .dual-viewer-controls__status-text    SyN status label next to the dot
+ *   .dual-viewer-controls__error          Red error detail paragraph
+ *   .dual-viewer-controls__run-btn        Primary "Run SyN" button
+ *   .dual-viewer-controls__opacity-row    Opacity slider row
+ *   .dual-viewer-controls__opacity-slider Slider with teal accent
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Root layout ───────────────────────────────────────────────────────────── */
+
+/*
+ * The dual viewer occupies the full viewer area.  It uses a horizontal flexbox:
+ *   ┌────────────────────────────────────────┬──────────────┐
+ *   │              __panes                   │   __sidebar  │
+ *   │  ┌─────────────────┬─────────────────┐ │              │
+ *   │  │   __pane (L)    │   __pane (R)    │ │              │
+ *   │  └─────────────────┴─────────────────┘ │              │
+ *   └────────────────────────────────────────┴──────────────┘
+ */
+.dual-viewer {
+  display:        flex;
+  flex-direction: row;
+  width:          100%;
+  height:         100%;
+  overflow:       hidden;
+  background:     var(--bg-app, #0a0a0a);
+}
+
+/* ── Two-pane canvas area ──────────────────────────────────────────────────── */
+
+.dual-viewer__panes {
+  display: flex;
+  flex:    1 1 0;
+  gap:     2px;
+  overflow: hidden;
+}
+
+/* Each half-pane is a flex column: label on top, canvas fills the rest */
+.dual-viewer__pane {
+  position:        relative;
+  display:         flex;
+  flex-direction:  column;
+  flex:            1 1 0;
+  overflow:        hidden;
+  background:      var(--bg-panel, #111111);
+  border:          1px solid var(--border, #2a2a2a);
+  border-radius:   4px;
+}
+
+/* ── Pane label ────────────────────────────────────────────────────────────── */
+
+/* Thin caption strip at the top of each pane */
+.dual-viewer__pane-label {
+  flex-shrink:   0;
+  padding:       3px var(--space-3, 12px);
+  font-size:     10px;
+  font-family:   var(--font-mono, monospace);
+  font-weight:   600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color:         var(--text-hint, #555);
+  background:    var(--bg-panel-alt, #161616);
+  border-bottom: 1px solid var(--border, #2a2a2a);
+  user-select:   none;
+}
+
+/* ── VTK canvas container ──────────────────────────────────────────────────── */
+
+/* vtk.js creates a <canvas> inside this div; it must fill all remaining space */
+.dual-viewer__canvas {
+  flex:     1 1 0;
+  position: relative;
+  overflow: hidden;
+  /* vtk.js positions its canvas absolutely inside this container */
+  min-height: 0;
+}
+
+/* Slight blue tint on the right pane's label area to help users distinguish */
+.dual-viewer__canvas--right {
+  /* no visual difference needed on the canvas itself — label handles it */
+}
+
+/* ── Empty-state placeholder (before SyN runs) ────────────────────────────── */
+
+.dual-viewer__empty-hint {
+  position:   absolute;
+  inset:      0;
+  display:    flex;
+  align-items: center;
+  justify-content: center;
+  font-size:  12px;
+  font-family: var(--font-mono, monospace);
+  color:      var(--text-hint, #555);
+  pointer-events: none;
+  padding:    var(--space-4, 16px);
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* ── Sidebar ────────────────────────────────────────────────────────────────── */
+
+.dual-viewer__sidebar {
+  flex-shrink:    0;
+  width:          var(--panel-width, 280px);
+  height:         100%;
+  overflow-y:     auto;
+  background:     var(--bg-panel, #111111);
+  border-left:    1px solid var(--border, #2a2a2a);
+  display:        flex;
+  flex-direction: column;
+  padding:        var(--space-2, 8px) 0;
+  /* Thin scrollbar so it doesn't eat into the panel width */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.dual-viewer__sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.dual-viewer__sidebar::-webkit-scrollbar-thumb {
+  background:    var(--border, #2a2a2a);
+  border-radius: 2px;
+}
+
+/* ── Controls sections ─────────────────────────────────────────────────────── */
+
+.dual-viewer-controls__section {
+  /* Inherits .control-section padding and border-bottom from global styles */
+}
+
+/* ── Hint paragraph ────────────────────────────────────────────────────────── */
+
+.dual-viewer-controls__hint {
+  font-size:   9px;
+  color:       var(--text-hint, #555);
+  line-height: 1.5;
+  margin-bottom: var(--space-2, 8px);
+}
+
+/* ── File picker ───────────────────────────────────────────────────────────── */
+
+.dual-viewer-controls__file-row {
+  display:        flex;
+  flex-direction: column;
+  gap:            2px;
+  margin-bottom:  var(--space-2, 8px);
+}
+
+.dual-viewer-controls__file-label {
+  font-size:   10px;
+  color:       var(--text-secondary, #8a8a8a);
+  font-weight: 500;
+}
+
+.dual-viewer-controls__file-input {
+  font-size:    10px;
+  color:        var(--text-primary, #e8e8e8);
+  background:   var(--bg-section, #1e1e1e);
+  border:       1px solid var(--border, #2a2a2a);
+  border-radius: 3px;
+  padding:      3px 4px;
+  width:        100%;
+  cursor:       pointer;
+}
+
+.dual-viewer-controls__file-input::file-selector-button {
+  background:   var(--bg-panel-alt, #161616);
+  color:        var(--text-secondary, #8a8a8a);
+  border:       1px solid var(--border, #2a2a2a);
+  border-radius: 3px;
+  padding:      2px 6px;
+  font-size:    10px;
+  cursor:       pointer;
+  margin-right: 6px;
+}
+
+.dual-viewer-controls__file-input:disabled {
+  opacity: 0.5;
+  cursor:  not-allowed;
+}
+
+.dual-viewer-controls__file-name {
+  font-size:     9px;
+  color:         var(--text-hint, #555);
+  overflow:      hidden;
+  text-overflow: ellipsis;
+  white-space:   nowrap;
+  max-width:     100%;
+}
+
+/* ── Status label ──────────────────────────────────────────────────────────── */
+
+.dual-viewer-controls__status-text {
+  font-size: 11px;
+  color:     var(--text-secondary, #8a8a8a);
+}
+
+/* ── Error detail ──────────────────────────────────────────────────────────── */
+
+.dual-viewer-controls__error {
+  font-size:     9px;
+  color:         var(--accent-red, #e05252);
+  margin-top:    2px;
+  margin-bottom: var(--space-2, 8px);
+  line-height:   1.4;
+  word-break:    break-word;
+}
+
+/* ── Run SyN button ────────────────────────────────────────────────────────── */
+
+.dual-viewer-controls__run-btn {
+  width:         100%;
+  margin-top:    var(--space-1, 3px);
+  margin-bottom: var(--space-3, 10px);
+}
+
+/* ── Opacity slider ────────────────────────────────────────────────────────── */
+
+.dual-viewer-controls__opacity-row {
+  /* Inherits .control-row layout */
+}
+
+/* Teal accent — neutral colour that doesn't imply a data polarity */
+.dual-viewer-controls__opacity-slider {
+  accent-color: #00bfa5;
+}
+
+.dual-viewer-controls__opacity-slider:disabled {
+  opacity: 0.4;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Dual-viewer — Tissue overlay toggle panel
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.dual-seg-panel {
+  /* Inherits .control-section padding and borders */
+}
+
+.dual-seg-panel__toggles {
+  display:        flex;
+  flex-direction: column;
+  gap:            6px;
+  margin-top:     var(--space-1, 3px);
+}
+
+.dual-seg-panel__toggle-label {
+  display:     flex;
+  align-items: center;
+  gap:         6px;
+  cursor:      pointer;
+  font-size:   11px;
+  color:       var(--text-primary, #ddd);
+  user-select: none;
+}
+
+.dual-seg-panel__toggle-checkbox {
+  width:  13px;
+  height: 13px;
+  cursor: pointer;
+  accent-color: #00bfa5;
+  flex-shrink: 0;
+}
+
+/* Coloured dot matches TISSUE_CSS_COLORS in tissueGroups.ts */
+.dual-seg-panel__toggle-dot {
+  width:         8px;
+  height:        8px;
+  border-radius: 50%;
+  flex-shrink:   0;
+  display:       inline-block;
+}
+
+.dual-seg-panel__toggle-name {
+  flex: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Dual-viewer — Comparative hippocampal volumetrics table
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.dual-volumetrics {
+  /* Inherits .control-section */
+}
+
+.dual-volumetrics__table {
+  width:           100%;
+  border-collapse: collapse;
+  font-size:       10px;
+  margin-top:      var(--space-1, 3px);
+  color:           var(--text-primary, #ddd);
+}
+
+.dual-volumetrics__th {
+  text-align:    center;
+  font-weight:   600;
+  font-size:     9px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color:          var(--text-hint, #888);
+  padding:        2px 4px 4px;
+  border-bottom:  1px solid var(--border-subtle, #333);
+}
+
+/* Row zebra striping */
+.dual-volumetrics__table tbody tr:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dual-volumetrics__label {
+  padding:    3px 4px;
+  color:      var(--text-secondary, #aaa);
+  font-size:  10px;
+  white-space: nowrap;
+}
+
+.dual-volumetrics__value {
+  text-align:  right;
+  padding:     3px 6px;
+  font-size:   10px;
+  font-variant-numeric: tabular-nums;
+  /* Teal accent for numeric values — matches the run button / opacity slider accent */
+  color:       #00bfa5;
+}
+
+/* Last row (Total) slightly bolder */
+.dual-volumetrics__table tbody tr:last-child .dual-volumetrics__label,
+.dual-volumetrics__table tbody tr:last-child .dual-volumetrics__value {
+  font-weight:  600;
+  border-top:   1px solid var(--border-subtle, #333);
+  padding-top:  4px;
+}
+
+/* ── Phase 9: Dynamic split-screen layout ────────────────────────────────── */
+
+/*
+ * When Subject B is loaded the workspace switches from a single full-width
+ * VTK canvas to two equally-sized side-by-side panes.
+ *
+ * plugin-workspace--split
+ *   Added to .plugin-workspace by VolumetricViewer when hasVolumeB is true.
+ *   Keeps the sidebar (.plugin-controls / :last-child) at its fixed width and
+ *   lets the two VTK panes share the remaining horizontal space equally.
+ *
+ * vtk-pane
+ *   Each half of the split view — same role as .vtk-container but flexible.
+ *   A thin 1 px separator between the two panes provides visual distinction
+ *   without stealing precious rendering real-estate.
+ *
+ * vtk-pane-label
+ *   "Subject A" / "Subject B" overlay badge — positioned top-centre of each
+ *   pane, distinct from the quadrant labels (Axial / Coronal / …) which are
+ *   positioned in the four quadrant corners.
+ */
+
+.plugin-workspace--split {
+  /* Override the default flex layout so two panes + sidebar sit side-by-side */
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  overflow: hidden;
+}
+
+.vtk-pane {
+  flex: 1;                   /* each pane claims equal width */
+  position: relative;
+  background: #000;
+  overflow: hidden;
+  min-width: 0;              /* prevent flex blowout */
+}
+
+/* Thin border between the two VTK panes */
+.vtk-pane + .vtk-pane {
+  border-left: 1px solid var(--border);
+}
+
+/* vtk.js appends a <canvas> as a direct child — same as .vtk-container */
+.vtk-pane > canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Subject A / Subject B name badge — top-centre of each pane */
+.vtk-pane-label {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;               /* above quadrant labels (z-index 10) */
+  pointer-events: none;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #000;
+  background: var(--accent-green);
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+/* ── Subject B drop zone (inside controls sidebar) ────────────────────────── */
+
+.subjectb-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 12px;
+  border: 1.5px dashed var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+  min-height: 80px;
+}
+
+.subjectb-dropzone:hover,
+.subjectb-dropzone:focus,
+.subjectb-dropzone--active {
+  border-color: var(--accent-green);
+  background: rgba(0, 230, 118, 0.04);
+  outline: none;
+}
+
+.subjectb-dropzone__icon {
+  font-size: 22px;
+  color: var(--accent-green);
+  line-height: 1;
+}
+
+.subjectb-dropzone__label {
+  font-size: 12px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.subjectb-dropzone__hint {
+  font-size: 10px;
+  color: var(--text-hint);
+  font-family: var(--font-mono);
+}
+
+/* ── Phase 10: Alignment Mode Toggle ──────────────────────────────────────── */
+
+/* Segmented-control container */
+.alignment-toggle {
+  display: flex;
+  flex-direction: row;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  width: 100%;
+}
+
+/* Individual pill option */
+.alignment-toggle__option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 6px;
+  font-size: 11px;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-section);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+/* Divider between the two pills */
+.alignment-toggle__option + .alignment-toggle__option {
+  border-left: 1px solid var(--border);
+}
+
+.alignment-toggle__option:hover:not(:disabled) {
+  background: var(--bg-panel-alt);
+  color: var(--text-primary);
+}
+
+/* Active/selected state — green pill with dark text */
+.alignment-toggle__option--active {
+  background: var(--accent-green);
+  color: #000;
+  font-weight: 600;
+}
+
+.alignment-toggle__option--active:hover:not(:disabled) {
+  background: var(--accent-green);
+  color: #000;
+}
+
+/* Disabled state while SyN is running */
+.alignment-toggle__option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Loading variant — slightly dimmed so spinner is readable */
+.alignment-toggle__option--loading {
+  opacity: 0.75;
+}
+
+/* Inline spinner inside the SyN Alignment button */
+.alignment-toggle__spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid rgba(0, 0, 0, 0.3);
+  border-top-color: #000;
+  border-radius: 50%;
+  animation: alignment-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+/* Spinner for non-active button (white variant) */
+.alignment-toggle__option:not(.alignment-toggle__option--active) .alignment-toggle__spinner {
+  border-color: rgba(255, 255, 255, 0.25);
+  border-top-color: var(--text-secondary);
+}
+
+@keyframes alignment-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Cached hint text under toggle */
+.dual-viewer-controls__hint--cached {
+  margin-top: 6px;
+  font-size: 9px;
+  color: var(--accent-green);
+  opacity: 0.75;
+}
+
+/* Alignment section — tighter bottom padding */
+.dual-viewer-controls__alignment {
+  padding-bottom: 10px;
+}
+
+/* ── Phase 10: Right-pane loading + error overlays ────────────────────────── */
+
+/* Semi-transparent curtain over the right vtk pane while parsing / registering */
+.dual-viewer__loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(10, 10, 10, 0.72);
+  backdrop-filter: blur(2px);
+  pointer-events: none;
+}
+
+/* Spinning circle in the overlay */
+.dual-viewer__loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(0, 230, 118, 0.2);
+  border-top-color: var(--accent-green);
+  border-radius: 50%;
+  animation: alignment-spin 0.85s linear infinite;
+}
+
+/* Primary text in the overlay */
+.dual-viewer__loading-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+}
+
+/* Secondary/sub text in the overlay */
+.dual-viewer__loading-subtext {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+/* Error hint inside the right pane (red tint) */
+.dual-viewer__empty-hint--error {
+  color: var(--accent-red);
+  background: rgba(255, 77, 79, 0.08);
+  border: 1px solid rgba(255, 77, 79, 0.3);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 11px;
+  text-align: center;
+  max-width: 240px;
+}

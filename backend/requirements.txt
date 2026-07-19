@@ -1,0 +1,28 @@
+# nfti_viewer backend — Python environment
+# Install: pip install -r requirements.txt
+#
+# Python >= 3.10 required (uses match statements and | union types in type hints)
+
+# ── Core web framework ────────────────────────────────────────────────────────
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0       # ASGI server with websocket + h11 support
+python-multipart>=0.0.9         # required for UploadFile / Form parsing
+
+# ── Data model validation ─────────────────────────────────────────────────────
+pydantic>=2.7.0
+
+# ── Neuroimaging ──────────────────────────────────────────────────────────────
+mne>=1.7.0                      # MEG/EEG analysis; pulls numpy, scipy, matplotlib
+numpy>=1.26.0
+scipy>=1.13.0                   # signal processing, resampling
+nibabel>=3.0.0                  # NIfTI file I/O (.nii / .nii.gz)
+dipy>=1.7.0                     # affine + SyN diffeomorphic registration
+
+# ── ONNX inference (SynthSeg, AnomalySeg) ────────────────────────────────────
+onnxruntime>=1.17.0             # CPU inference for ONNX models
+
+# ── Machine learning (required by mne.decoding) ───────────────────────────────
+scikit-learn>=1.3.0
+
+# ── Optional: faster JSON serialisation (FastAPI uses it automatically) ───────
+orjson>=3.10.0

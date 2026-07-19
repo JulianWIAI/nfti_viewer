@@ -1,0 +1,101 @@
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# ── Python / Backend ──────────────────────────────────────────────────────────
+
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments (your .venv is at the project root)
+.venv/
+venv/
+env/
+.env/
+ENV/
+
+# Python packaging artefacts
+*.egg-info/
+.eggs/
+build/
+*.egg
+
+# ── ML Models ─────────────────────────────────────────────────────────────────
+# Downloaded at setup time via backend/download_models.py — not stored in git.
+# SynthSeg.onnx and AnomalySeg.onnx live here and can be 100+ MB each.
+
+backend/models/
+
+# ── Environment variables & secrets ──────────────────────────────────────────
+
+.env
+.env.local
+.env.*.local
+
+# ── Neuroimaging data files ───────────────────────────────────────────────────
+# Patient data must never be committed. Load from local disk at runtime.
+
+*.nii
+*.nii.gz
+*.mgz
+*.mgh
+*.edf
+*.bdf
+*.vhdr
+*.eeg
+*.vmrk
+*.snirf
+*.fif
+*.ds/
+data/
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ── OS junk ──────────────────────────────────────────────────────────────────
+
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+desktop.ini
+$RECYCLE.BIN/
+
+# ── Editor / IDE ──────────────────────────────────────────────────────────────
+
+.idea/
+*.iml
+*.iws
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# VS Code workspace settings are personal; keep only shared extensions list
+.vscode/*
+!.vscode/extensions.json
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+
+*.bak
+*.tmp
+*.swp
+*.swo
+*~

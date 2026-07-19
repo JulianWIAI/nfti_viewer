@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!--
+      Security headers required for SharedArrayBuffer, which ONNX Runtime Web
+      uses in its multi-threaded WASM backend. These meta-tag equivalents work
+      on GitHub Pages where you cannot set HTTP response headers directly.
+
+      NOTE: The <meta> version of COOP/COEP is not officially supported by all
+      browsers. For production, prefer a service-worker proxy that injects the
+      real HTTP headers (see: https://github.com/gzuidhof/coi-serviceworker).
+    -->
+    <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin" />
+    <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp" />
+
+    <title>NIfTI 3D Brain Viewer</title>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <!--
+      Vite injects the bundled ES-module entry point here at build time.
+      During development the dev server serves src/main.tsx directly.
+    -->
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
