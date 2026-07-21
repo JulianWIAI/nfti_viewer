@@ -2,7 +2,7 @@
  * longitudinalApi.ts — HTTP client for POST /api/longitudinal/delta
  * ──────────────────────────────────────────────────────────────────
  *
- * Mirrors anomalyApi.ts: a thin, typed fetch wrapper that returns a strongly-
+ * Mirrors anomalyApi.ts: a thin, typed wrapper that returns a strongly-
  * typed result object or throws a descriptive Error on failure.
  *
  * The endpoint accepts two NIfTI uploads (baseline + follow-up), co-registers
@@ -10,7 +10,12 @@
  * (mutual information metric, CoM → Translation → Rigid → optional Affine),
  * subtracts the arrays, and returns the float32 delta volume serialised in
  * Fortran order (X-fastest, matching vtk.js vtkImageData layout).
+ *
+ * Upload progress is tracked via XMLHttpRequest (xhrPost) so callers can
+ * display a byte-level progress bar during the file transfer phase.
  */
+
+import { xhrPost } from '../lib/xhrUpload';
 
 /** Typed response from the FastAPI longitudinal delta endpoint. */
 export interface LongitudinalApiResult {
@@ -50,6 +55,21 @@ export interface LongitudinalApiResult {
   transform_type: string;
 }
 
+// ── Optional progress callbacks ────────────────────────────────────────────────
+
+/**
+ * Options for longitudinalApi.computeDelta enabling upload-progress tracking.
+ *
+ * onUploadProgress — called with a percentage 0–100 as bytes are sent
+ * onUploadComplete — called once all bytes have been transmitted
+ * signal           — optional AbortSignal for cancellation
+ */
+export interface LongitudinalOptions {
+  onUploadProgress?: (pct: number) => void;
+  onUploadComplete?: () => void;
+  signal?:           AbortSignal;
+}
+
 export const longitudinalApi = {
   /**
    * POST /api/longitudinal/delta
@@ -57,38 +77,37 @@ export const longitudinalApi = {
    * Upload two NIfTI files (baseline + follow-up) and receive a float32 delta
    * volume co-registered to the baseline voxel space.
    *
+   * Always uses xhrPost so upload-progress callbacks are available.
+   * Both files are appended to the same FormData; the backend separates them
+   * by the field names 'baseline', 'followup', and 'transform_type'.
+   *
    * @param baseline      Earlier scan — the delta is returned in this scan's space.
    * @param followup      Later scan — co-registered to baseline before subtraction.
    * @param transformType 'rigid' (recommended for same-scanner data, ~30–60 s) or
    *                      'affine' (cross-scanner with different voxel sizes, ~60–120 s).
+   * @param options       Optional progress callbacks and abort signal.
    * @throws Error with a human-readable message on network failure or non-OK status.
    */
   async computeDelta(
     baseline:      File,
     followup:      File,
     transformType: 'rigid' | 'affine' = 'rigid',
+    options?:      LongitudinalOptions,
   ): Promise<LongitudinalApiResult> {
+    // Build the multipart form payload with both NIfTI files and the
+    // transform type parameter.  Field names match the FastAPI endpoint.
     const form = new FormData();
     form.append('baseline',       baseline);
     form.append('followup',       followup);
     form.append('transform_type', transformType);
 
-    const res = await fetch('/api/longitudinal/delta', {
-      method: 'POST',
-      body:   form,
+    // Use xhrPost for real byte-level upload progress tracking.
+    return xhrPost<LongitudinalApiResult>({
+      url:              '/api/longitudinal/delta',
+      form,
+      onUploadProgress: options?.onUploadProgress,
+      onUploadComplete: options?.onUploadComplete,
+      signal:           options?.signal,
     });
-
-    if (!res.ok) {
-      // Surface the FastAPI detail message when available.
-      const text = await res.text().catch(() => res.statusText);
-      let detail = text;
-      try {
-        const json = JSON.parse(text) as { detail?: string };
-        if (json.detail) detail = json.detail;
-      } catch { /* not JSON — use raw text */ }
-      throw new Error(`Longitudinal delta failed (${res.status}): ${detail}`);
-    }
-
-    return res.json() as Promise<LongitudinalApiResult>;
   },
 };

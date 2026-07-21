@@ -2,9 +2,14 @@
  * anomalyApi.ts — HTTP client for POST /api/anomalies/detect
  * ─────────────────────────────────────────────────────────────
  *
- * Mirrors the pattern used by segmentApi.ts: a thin fetch wrapper that
+ * Mirrors the pattern used by segmentApi.ts: a thin wrapper that
  * returns a typed result object or throws a descriptive Error.
+ *
+ * Upload progress is tracked via XMLHttpRequest (xhrPost) so callers can
+ * display a byte-level progress bar during the file transfer phase.
  */
+
+import { xhrPost } from '../lib/xhrUpload';
 
 /** Typed response from the FastAPI anomaly detection endpoint. */
 export interface AnomalyApiResult {
@@ -20,6 +25,21 @@ export interface AnomalyApiResult {
   duration_ms: number;
 }
 
+// ── Optional progress callbacks ────────────────────────────────────────────────
+
+/**
+ * Options for anomalyApi.detect enabling upload-progress tracking.
+ *
+ * onUploadProgress — called with a percentage 0–100 as bytes are sent
+ * onUploadComplete — called once all bytes have been transmitted
+ * signal           — optional AbortSignal for cancellation
+ */
+export interface AnomalyOptions {
+  onUploadProgress?: (pct: number) => void;
+  onUploadComplete?: () => void;
+  signal?:           AbortSignal;
+}
+
 export const anomalyApi = {
   /**
    * POST /api/anomalies/detect
@@ -28,36 +48,26 @@ export const anomalyApi = {
    * already in the original voxel space — the backend handles resampling from
    * 1mm isotropic BraTS space (240×240×155) back to the source dimensions.
    *
-   * @param file  The same NIfTI File object uploaded by the user.
+   * Always uses xhrPost so upload-progress callbacks are available.
+   * Field name must match the FastAPI parameter name 'nifti_file'.
+   *
+   * @param file    The same NIfTI File object uploaded by the user.
+   * @param options Optional progress callbacks and abort signal.
    * @throws Error with a human-readable message on network failure or non-OK status.
    */
-  async detect(file: File): Promise<AnomalyApiResult> {
-    const form = new FormData();
+  async detect(file: File, options?: AnomalyOptions): Promise<AnomalyApiResult> {
+    // Build the multipart form payload.
     // Field name must match the FastAPI parameter name 'nifti_file'.
+    const form = new FormData();
     form.append('nifti_file', file);
 
-    const res = await fetch('/api/anomalies/detect', {
-      method: 'POST',
-      body:   form,
+    // Use xhrPost for real byte-level upload progress tracking.
+    return xhrPost<AnomalyApiResult>({
+      url:              '/api/anomalies/detect',
+      form,
+      onUploadProgress: options?.onUploadProgress,
+      onUploadComplete: options?.onUploadComplete,
+      signal:           options?.signal,
     });
-
-    if (!res.ok) {
-      // Surface the FastAPI detail message when available.
-      // FastAPI validation errors return detail as an array, not a string,
-      // so coerce to string explicitly to avoid "[object Object]" display.
-      const text = await res.text().catch(() => res.statusText);
-      let detail = text;
-      try {
-        const json = JSON.parse(text) as { detail?: unknown };
-        if (json.detail !== undefined) {
-          detail = typeof json.detail === 'string'
-            ? json.detail
-            : JSON.stringify(json.detail);
-        }
-      } catch { /* not JSON — use raw text */ }
-      throw new Error(`Anomaly detection failed (${res.status}): ${detail}`);
-    }
-
-    return res.json() as Promise<AnomalyApiResult>;
   },
 };

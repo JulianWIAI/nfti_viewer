@@ -21,6 +21,9 @@
 import { useState, useCallback } from 'react';
 import './App.css';
 
+// ── Progress bar styles (GlobalTaskBar + InlineTaskProgress) ─────────────────
+import './components/progress/progress.css';
+
 import { registerPlugin, getPlugin } from './core/ModalityRegistry';
 import { BidsRouter } from './core/BidsRouter';
 
@@ -34,6 +37,10 @@ import multimodalPlugin from './plugins/multimodal/index';
 import FileUpload      from './components/FileUpload';
 import ReferenceDrawer from './components/ReferenceDrawer';
 import { ReferencePanelProvider, useReferencePanel } from './contexts/ReferencePanelContext';
+
+// ── Global task progress registry + floating panel ───────────────────────────
+import { TaskProgressProvider } from './contexts/TaskProgressContext';
+import GlobalTaskBar from './components/progress/GlobalTaskBar';
 
 import type { PluginData, NeuroimagingPlugin } from './types/plugin.types';
 
@@ -202,19 +209,30 @@ function AppContent() {
 
       {/* ── Global Reference Drawer — fixed overlay, visible from any view ── */}
       <ReferenceDrawer />
+
+      {/* ── Global floating task bar — fixed bottom-right, z-index 1000 ──── */}
+      {/* Shows progress cards for all active neuroimaging pipeline tasks.    */}
+      <GlobalTaskBar />
     </div>
   );
 }
 
 // ── Root export ───────────────────────────────────────────────────────────────
-// ReferencePanelProvider sits at the very root so navigateToRegion() and
-// openDrawer() are callable from VolumetricViewer, TimeseriesControls, and
-// any other descendant without additional context nesting.
+// Provider nesting order (outermost first):
+//   TaskProgressProvider   — global task registry (GlobalTaskBar + useTaskProgress)
+//   ReferencePanelProvider — reference drawer (navigateToRegion / openDrawer)
+//   AppContent             — app state, plugin routing, layout
+//
+// TaskProgressProvider is outside ReferencePanelProvider so that GlobalTaskBar
+// (rendered inside AppContent) can call useTaskProgress() without being inside
+// VolumetricViewer's provider tree.
 
 export default function App() {
   return (
-    <ReferencePanelProvider>
-      <AppContent />
-    </ReferencePanelProvider>
+    <TaskProgressProvider>
+      <ReferencePanelProvider>
+        <AppContent />
+      </ReferencePanelProvider>
+    </TaskProgressProvider>
   );
 }

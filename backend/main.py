@@ -1191,15 +1191,33 @@ _SYNTHSEG_SIZE = 256  # SynthSeg v2 expects exactly 256×256×256 voxels
 
 
 def _load_nifti(content: bytes):  # type: ignore[return]
-    """Load a NIfTI image from raw bytes, falling back to a temp file."""
+    """Load a NIfTI image from raw bytes, falling back to a temp file.
+
+    Some scanners produce headers whose quaternion has w² slightly negative
+    due to float32 rounding (e.g. -6e-7).  If nibabel rejects it, we relax
+    the threshold to -1e-6 and retry — the affine is unaffected in practice.
+    """
+    def _try_load(loader, *args, **kwargs):
+        try:
+            return loader(*args, **kwargs)
+        except ValueError as exc:
+            if "w2 should be positive" not in str(exc):
+                raise
+            old = nib.Nifti1Header.quaternion_threshold
+            try:
+                nib.Nifti1Header.quaternion_threshold = -1e-6
+                return loader(*args, **kwargs)
+            finally:
+                nib.Nifti1Header.quaternion_threshold = old
+
     try:
-        return nib.Nifti1Image.from_bytes(content)  # type: ignore[attr-defined]
+        return _try_load(nib.Nifti1Image.from_bytes, content)  # type: ignore[attr-defined]
     except AttributeError:
         pass
     tmp = tempfile.NamedTemporaryFile(suffix=".nii", delete=False)
     try:
         tmp.write(content); tmp.flush(); tmp.close()
-        return nib.load(tmp.name)
+        return _try_load(nib.load, tmp.name)
     finally:
         Path(tmp.name).unlink(missing_ok=True)
 

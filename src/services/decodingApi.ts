@@ -12,7 +12,12 @@
  *
  * API base URL:  Uses VITE_API_URL env var when set, falls back to
  *                http://localhost:8000 to match the FastAPI dev server.
+ *
+ * Upload progress is tracked via XMLHttpRequest (xhrPost) so callers can
+ * display a byte-level progress bar during the file transfer phase.
  */
+
+import { xhrPost } from '../lib/xhrUpload';
 
 const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8000';
 
@@ -79,6 +84,39 @@ export interface DecodingResult {
   durationMs:     number;
 }
 
+// ── Optional progress callbacks ────────────────────────────────────────────────
+
+/**
+ * Options for decodingApi.runMvpaDecoding enabling upload-progress tracking.
+ *
+ * onUploadProgress — called with a percentage 0–100 as bytes are sent
+ * onUploadComplete — called once all bytes have been transmitted
+ * signal           — optional AbortSignal for cancellation
+ */
+export interface DecodingOptions {
+  onUploadProgress?: (pct: number) => void;
+  onUploadComplete?: () => void;
+  signal?:           AbortSignal;
+}
+
+// ── Raw snake_case response from the backend ──────────────────────────────────
+
+/** Shape of the raw JSON the FastAPI endpoint returns (snake_case). */
+interface RawDecodeResponse {
+  times:            number[];
+  scores:           number[];
+  scores_std:       number[];
+  chance_level:     number;
+  n_epochs:         number;
+  n_epochs_class_a: number;
+  n_epochs_class_b: number;
+  n_channels:       number;
+  n_times:          number;
+  peak_score:       number;
+  peak_time_s:      number;
+  duration_ms:      number;
+}
+
 // ── API client ────────────────────────────────────────────────────────────────
 
 export const decodingApi = {
@@ -86,15 +124,16 @@ export const decodingApi = {
    * Run a time-resolved MVPA analysis on the supplied BrainVision EEG files.
    *
    * Builds a FormData with the three files and the form parameters, POSTs
-   * to /api/eeg/decode, and returns a camelCase-typed DecodingResult.
+   * to /api/eeg/decode via xhrPost (for upload progress), and returns a
+   * camelCase-typed DecodingResult.
    *
    * Throws an Error (with the backend `detail` string when available) on
    * any non-2xx response.
    *
-   * @param req — files + analysis parameters
-   * @param signal — optional AbortSignal for cancellation
+   * @param req     Files + analysis parameters.
+   * @param options Optional progress callbacks and abort signal.
    */
-  async runMvpaDecoding(req: DecodingRequest, signal?: AbortSignal): Promise<DecodingResult> {
+  async runMvpaDecoding(req: DecodingRequest, options?: DecodingOptions): Promise<DecodingResult> {
     const form = new FormData();
 
     // File uploads — use the original filename so the backend can validate the
@@ -115,38 +154,17 @@ export const decodingApi = {
     if (req.nFolds        !== undefined) form.append('n_folds',        String(req.nFolds));
     if (req.C             !== undefined) form.append('C',              String(req.C));
 
-    const resp = await fetch(`${API_BASE}/api/eeg/decode`, {
-      method: 'POST',
-      body:   form,
-      signal,
+    // Use xhrPost for real byte-level upload progress tracking.
+    // The raw response is snake_case JSON; we translate to camelCase below.
+    const json = await xhrPost<RawDecodeResponse>({
+      url:              `${API_BASE}/api/eeg/decode`,
+      form,
+      onUploadProgress: options?.onUploadProgress,
+      onUploadComplete: options?.onUploadComplete,
+      signal:           options?.signal,
     });
 
-    if (!resp.ok) {
-      // Extract the FastAPI `detail` field when the backend returns JSON.
-      let detail = `HTTP ${resp.status} ${resp.statusText}`;
-      try {
-        const err = await resp.json() as { detail?: unknown };
-        if (err.detail) detail = String(err.detail);
-      } catch { /* ignore JSON parse failures on non-JSON error bodies */ }
-      throw new Error(detail);
-    }
-
     // Translate snake_case JSON to camelCase TypeScript.
-    const json = await resp.json() as {
-      times: number[];
-      scores: number[];
-      scores_std: number[];
-      chance_level: number;
-      n_epochs: number;
-      n_epochs_class_a: number;
-      n_epochs_class_b: number;
-      n_channels: number;
-      n_times: number;
-      peak_score: number;
-      peak_time_s: number;
-      duration_ms: number;
-    };
-
     return {
       times:         json.times,
       scores:        json.scores,

@@ -75,6 +75,10 @@ import TimeScrubber from '../../components/TimeScrubber';
 import DecodingTimeline from '../../components/DecodingTimeline';
 import type { DecodingRequest } from '../../services/decodingApi';
 
+// ── Progress bar imports ──────────────────────────────────────────────────────
+import InlineTaskProgress from '../../components/progress/InlineTaskProgress';
+import { useTaskProgress } from '../../contexts/TaskProgressContext';
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function DecodingPanel(): JSX.Element {
@@ -86,6 +90,9 @@ export default function DecodingPanel(): JSX.Element {
     currentTimeIndex,
     setCurrentTimeIndex,
   } = useVolumetricContext();
+
+  // Read the global task registry to get the uploadPct for the 'decoding' task.
+  const { tasks } = useTaskProgress();
 
   // ── Local form state (ephemeral; not in context) ──────────────────────────
 
@@ -275,6 +282,29 @@ export default function DecodingPanel(): JSX.Element {
           {statusLabel()}
         </span>
       </div>
+
+      {/* ── Inline progress bar — shown while the task is active.
+           When decodingStatus is 'running' we check the global task entry:
+           if uploadPct < 100 we show the determinate bar; once upload is
+           done the global task transitions to 'running' (shimmer).
+           We derive the visual phase from the global task entry directly
+           so the bar reflects the actual upload vs. server-processing phase. */}
+      <InlineTaskProgress
+        phase={(() => {
+          // Map the global task entry phase to InlineTaskProgress phase.
+          // The global task entry is updated with setUploadProgress /
+          // setTaskRunning by VolumetricViewer, so it has finer-grained
+          // phase information than decodingStatus (which jumps straight
+          // from idle to 'running').
+          const taskEntry = tasks.get('decoding');
+          if (!taskEntry) {
+            // No task entry yet — map decodingStatus directly.
+            return decodingStatus.phase as 'uploading' | 'running' | 'done' | 'error' | 'idle';
+          }
+          return taskEntry.phase as 'uploading' | 'running' | 'done' | 'error';
+        })()}
+        uploadPct={tasks.get('decoding')?.uploadPct ?? 0}
+      />
 
       {/* ── Run button ──────────────────────────────────────────────────── */}
 

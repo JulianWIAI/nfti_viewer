@@ -36,6 +36,10 @@ import { useState, useRef, useEffect, useCallback, type FC } from 'react';
 import { useVolumetricContext } from './VolumetricViewer';
 import type { LongitudinalStatus } from './VolumetricViewer';
 
+// ── Progress bar imports ──────────────────────────────────────────────────────
+import InlineTaskProgress from '../../components/progress/InlineTaskProgress';
+import { useTaskProgress } from '../../contexts/TaskProgressContext';
+
 // ── Helper: human-readable status label ──────────────────────────────────────
 
 function statusLabel(s: LongitudinalStatus): string {
@@ -80,6 +84,9 @@ const LongitudinalPanel: FC = () => {
   const [baselineFile,   setBaselineFile]   = useState<File | null>(null);
   const [followupFile,   setFollowupFile]   = useState<File | null>(null);
   const [transformType,  setTransformType]  = useState<'rigid' | 'affine'>('rigid');
+
+  // Read the global task registry to get the uploadPct for the 'longitudinal' task.
+  const { tasks } = useTaskProgress();
 
   // ── RAF debounce ref for the opacity slider ───────────────────────────────
   const pendingRafRef = useRef<number | null>(null);
@@ -253,6 +260,12 @@ const LongitudinalPanel: FC = () => {
           {statusLabel(longitudinalStatus)}
         </span>
       </div>
+
+      {/* ── Inline progress bar — shown during uploading / running phases ── */}
+      <InlineTaskProgress
+        phase={longitudinalStatus.phase}
+        uploadPct={tasks.get('longitudinal')?.uploadPct ?? 0}
+      />
 
       {/* ── Error detail ────────────────────────────────────────────────── */}
       {longitudinalStatus.phase === 'error' && (

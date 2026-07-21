@@ -37,6 +37,10 @@ import { useRef, useCallback, type FC } from 'react';
 import { useVolumetricContext } from './VolumetricViewer';
 import type { AnomalyStatus } from './VolumetricViewer';
 
+// ── Progress bar imports ──────────────────────────────────────────────────────
+import InlineTaskProgress from '../../components/progress/InlineTaskProgress';
+import { useTaskProgress } from '../../contexts/TaskProgressContext';
+
 // ── Helper: human-readable status label ──────────────────────────────────────
 
 function statusLabel(s: AnomalyStatus): string {
@@ -76,6 +80,9 @@ const AnomalyPanel: FC = () => {
     runAnomalyDetection,
     clearAnomalyOverlay,
   } = useVolumetricContext();
+
+  // Read the global task registry to get the uploadPct for the 'anomaly' task.
+  const { tasks } = useTaskProgress();
 
   // ── RAF debounce ref for the opacity slider ───────────────────────────────
   // Stores the pending requestAnimationFrame id so we can cancel it when a
@@ -125,6 +132,12 @@ const AnomalyPanel: FC = () => {
         <span className={`status-dot ${dotClass(anomalyStatus)}`} />
         <span className="anomaly-panel__status-text">{statusLabel(anomalyStatus)}</span>
       </div>
+
+      {/* ── Inline progress bar — shown during uploading / running phases ── */}
+      <InlineTaskProgress
+        phase={anomalyStatus.phase}
+        uploadPct={tasks.get('anomaly')?.uploadPct ?? 0}
+      />
 
       {/* ── Error detail ────────────────────────────────────────────────── */}
       {anomalyStatus.phase === 'error' && (

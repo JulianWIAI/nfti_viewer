@@ -6,7 +6,12 @@
  * original voxel space, encoded as a base64 uint8 flat array.
  *
  * Setup: run `python backend/download_models.py` once to fetch the model.
+ *
+ * Upload progress is tracked via XMLHttpRequest (xhrPost) so callers can
+ * display a byte-level progress bar during the file transfer phase.
  */
+
+import { xhrPost } from '../lib/xhrUpload';
 
 const BASE = '';
 
@@ -25,28 +30,46 @@ export interface SegmentResult {
   duration_ms: number;
 }
 
+// ── Optional progress callbacks ────────────────────────────────────────────────
+
+/**
+ * Options passed to segmentApi.segment for upload-progress tracking.
+ *
+ * onUploadProgress — called with a percentage 0–100 as bytes are sent
+ * onUploadComplete — called once all bytes have been transmitted to the server
+ * signal           — optional AbortSignal for cancellation
+ */
+export interface SegmentOptions {
+  signal?:           AbortSignal;
+  onUploadProgress?: (pct: number) => void;
+  onUploadComplete?: () => void;
+}
+
 // ── API ───────────────────────────────────────────────────────────────────────
 
 export const segmentApi = {
   /**
    * POST the NIfTI File to /api/segment.
+   *
+   * Always uses xhrPost so upload progress callbacks are always available.
    * The File object is a zero-copy Blob reference — no extra memory is used.
+   *
+   * @param file    The NIfTI File to upload.
+   * @param options Optional progress callbacks and abort signal.
    */
-  async segment(file: File, signal?: AbortSignal): Promise<SegmentResult> {
+  async segment(file: File, options?: SegmentOptions): Promise<SegmentResult> {
+    // Build the multipart form payload.
     const form = new FormData();
     form.append('file', file, file.name);
 
-    const resp = await fetch(`${BASE}/api/segment`, {
-      method: 'POST',
-      body: form,
-      signal,
+    // Use xhrPost for real byte-level upload progress tracking.
+    // The URL, form, and callbacks are forwarded to the XHR wrapper.
+    return xhrPost<SegmentResult>({
+      url:               `${BASE}/api/segment`,
+      form,
+      onUploadProgress:  options?.onUploadProgress,
+      onUploadComplete:  options?.onUploadComplete,
+      signal:            options?.signal,
     });
-
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
-      throw new Error((err as { detail?: string }).detail ?? `Segmentation failed (${resp.status})`);
-    }
-
-    return resp.json() as Promise<SegmentResult>;
   },
 };

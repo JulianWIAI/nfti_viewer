@@ -14,6 +14,19 @@
  * function of useState / useCallback with no side-effects beyond the fetch call,
  * so it is trivially unit-testable in isolation.
  *
+ * UPLOAD PROGRESS
+ * ─────────────────
+ * runNeuralDecoding now accepts an optional second argument `options` that
+ * carries onUploadProgress and onUploadComplete callbacks.  These are forwarded
+ * to decodingApi.runMvpaDecoding which in turn forwards them to xhrPost, giving
+ * the caller (VolumetricViewer) byte-level upload progress.
+ *
+ * ERROR RETHROWING
+ * ─────────────────
+ * After setting the error state, the hook NOW rethrows the error so callers that
+ * wrap runNeuralDecoding in a try/catch (e.g. VolumetricViewer's wrappedRun) can
+ * call failTask() on the global task registry with the error message.
+ *
  * USAGE
  * ───────
  *   // Inside VolumetricViewer:
@@ -48,6 +61,22 @@ export type NeuralDecodingStatus =
   | { phase: 'done'; durationMs: number; peakScore: number; peakTimeS: number }
   | { phase: 'error'; message: string };
 
+// ── Optional progress callbacks ────────────────────────────────────────────────
+
+/**
+ * Upload-progress options for a single runNeuralDecoding call.
+ *
+ * Forwarded to decodingApi.runMvpaDecoding → xhrPost so the caller can track
+ * byte-level upload progress and the server processing phase independently.
+ *
+ * onUploadProgress — called with pct 0–100 as bytes are sent
+ * onUploadComplete — called once all bytes have been transmitted
+ */
+export interface NeuralDecodingRunOptions {
+  onUploadProgress?: (pct: number) => void;
+  onUploadComplete?: () => void;
+}
+
 // ── Hook return shape ─────────────────────────────────────────────────────────
 
 export interface NeuralDecodingState {
@@ -60,11 +89,15 @@ export interface NeuralDecodingState {
    *
    * Sets status to `running`, awaits the fetch, then transitions to `done`
    * (with summary statistics) or `error` (with the backend message).
-   * Safe to call while another run is in progress — the caller should guard
-   * with `decodingStatus.phase === 'running'` before showing the button as
-   * enabled.
+   *
+   * On error the hook sets its own error state AND rethrows the error so
+   * callers that wrap this in try/catch (e.g. VolumetricViewer) can call
+   * failTask() on the global task registry.
+   *
+   * @param req     Files and analysis parameters.
+   * @param options Optional upload-progress callbacks.
    */
-  runNeuralDecoding: (req: DecodingRequest) => Promise<void>;
+  runNeuralDecoding: (req: DecodingRequest, options?: NeuralDecodingRunOptions) => Promise<void>;
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -78,29 +111,51 @@ export function useNeuralDecoding(): NeuralDecodingState {
    *
    * The dep array is empty because `decodingApi.runMvpaDecoding` is a module-
    * level constant and the setters from useState are referentially stable.
-   * The `req` argument is read at call time (not captured at creation time),
-   * so the files and parameters are always current.
+   * The `req` and `options` arguments are read at call time so they are always
+   * current.
+   *
+   * ERROR BEHAVIOUR:
+   * After catching an error, the hook sets the 'error' phase state so the
+   * DecodingPanel can display the error message via decodingStatus.
+   * It then RETHROWS the error so VolumetricViewer's wrappedRun can call
+   * failTask() on the global task registry.
    */
-  const runNeuralDecoding = useCallback(async (req: DecodingRequest): Promise<void> => {
-    setDecodingStatus({ phase: 'running' });
+  const runNeuralDecoding = useCallback(
+    async (req: DecodingRequest, options?: NeuralDecodingRunOptions): Promise<void> => {
+      // Transition to 'running' immediately to disable the Run button.
+      // Note: this shows 'running' before upload starts; the caller can
+      // use onUploadProgress to differentiate upload vs. server phases.
+      setDecodingStatus({ phase: 'running' });
 
-    try {
-      const result = await decodingApi.runMvpaDecoding(req);
+      try {
+        // Delegate to the API client, forwarding any progress callbacks.
+        const result = await decodingApi.runMvpaDecoding(req, {
+          onUploadProgress: options?.onUploadProgress,
+          onUploadComplete: options?.onUploadComplete,
+        });
 
-      setDecodingData(result);
-      setDecodingStatus({
-        phase:      'done',
-        durationMs: result.durationMs,
-        peakScore:  result.peakScore,
-        peakTimeS:  result.peakTimeS,
-      });
-    } catch (err) {
-      setDecodingStatus({
-        phase:   'error',
-        message: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }, []);
+        // Pipeline succeeded — store the result and update status.
+        setDecodingData(result);
+        setDecodingStatus({
+          phase:      'done',
+          durationMs: result.durationMs,
+          peakScore:  result.peakScore,
+          peakTimeS:  result.peakTimeS,
+        });
+      } catch (err) {
+        // Set error state so the DecodingPanel can display the message.
+        setDecodingStatus({
+          phase:   'error',
+          message: err instanceof Error ? err.message : String(err),
+        });
+
+        // Rethrow so VolumetricViewer's try/catch can call failTask()
+        // on the global task registry with the same error message.
+        throw err;
+      }
+    },
+    [], // No reactive deps — setters and API client are stable module constants.
+  );
 
   return { decodingData, decodingStatus, runNeuralDecoding };
 }

@@ -77,6 +77,9 @@ import { useNeuralDecoding } from './useNeuralDecoding';
 import type { NeuralDecodingStatus } from './useNeuralDecoding';
 import type { DecodingRequest, DecodingResult } from '../../services/decodingApi';
 
+// ── Task progress context (global floating task bar) ──────────────────────────
+import { useTaskProgress } from '../../contexts/TaskProgressContext';
+
 import {
   ComparisonContext,
   type ComparisonContextValue,
@@ -271,7 +274,9 @@ const VolumetricViewer: FC<PluginViewerProps> = ({ data, controlsSlot }) => {
   const [volumetricsErrorB,   setVolumetricsErrorB]  = useState<string | null>(null);
 
   // ── Neural decoding (MVPA) ──────────────────────────────────────────────────
-  const { decodingData, decodingStatus, runNeuralDecoding } = useNeuralDecoding();
+  // Rename the raw hook's runNeuralDecoding to _runNeuralDecoding so we can
+  // wrap it below with TaskProgress calls without naming conflicts.
+  const { decodingData, decodingStatus, runNeuralDecoding: _runNeuralDecoding } = useNeuralDecoding();
   const [currentTimeIndex, setCurrentTimeIndex] = useState(0);
 
   // ── Connectome ──────────────────────────────────────────────────────────────
@@ -299,6 +304,17 @@ const VolumetricViewer: FC<PluginViewerProps> = ({ data, controlsSlot }) => {
   const [longitudinalOpacity,     setLongitudinalOpacityState] = useState(0.8);
   const [nPositive,               setNPositive]               = useState(0);
   const [nNegative,               setNNegative]               = useState(0);
+
+  // ── Global task progress registry ───────────────────────────────────────────
+  // Provides registerTask / setUploadProgress / setRunning / completeTask /
+  // failTask so each pipeline operation can be tracked in the GlobalTaskBar.
+  const {
+    registerTask,
+    setUploadProgress,
+    setRunning:   setTaskRunning,
+    completeTask,
+    failTask,
+  } = useTaskProgress();
 
   const getVtkCtx = useCallback(() => vtkRef.current.ctx, []);
 
@@ -687,6 +703,9 @@ const VolumetricViewer: FC<PluginViewerProps> = ({ data, controlsSlot }) => {
       setHasOverlayB(false);
     }
 
+    // Register both subjects in the global floating task bar before upload starts.
+    registerTask('seg-a', 'Segmentation — Subject A');
+    registerTask('seg-b', 'Segmentation — Subject B');
     setInferenceStatus({ phase: 'uploading' });
     setInferenceStatusB({ phase: 'uploading' });
 
@@ -699,7 +718,14 @@ const VolumetricViewer: FC<PluginViewerProps> = ({ data, controlsSlot }) => {
     const bMidJ = bDims ? Math.floor(bDims[2] / 2) : 0;
     const bMidI = bDims ? Math.floor(bDims[1] / 2) : 0;
 
-    dualSegmentApi.segmentBoth(fileA, fileB)
+    dualSegmentApi.segmentBoth(fileA, fileB, {
+      // Subject A progress callbacks — forward to global task bar entry 'seg-a'.
+      onProgressA: (pct) => setUploadProgress('seg-a', pct),
+      onCompleteA: () => setTaskRunning('seg-a'),
+      // Subject B progress callbacks — forward to global task bar entry 'seg-b'.
+      onProgressB: (pct) => setUploadProgress('seg-b', pct),
+      onCompleteB: () => setTaskRunning('seg-b'),
+    })
       .then(([resultA, resultB]) => {
         setInferenceStatus({ phase: 'running' });
         setInferenceStatusB({ phase: 'running' });
@@ -721,6 +747,8 @@ const VolumetricViewer: FC<PluginViewerProps> = ({ data, controlsSlot }) => {
         setHasOverlay(true);
         setShowOverlayState(true);
         setInferenceStatus({ phase: 'done', durationMs: Math.round(resultA.duration_ms) });
+        // Mark Subject A as done in the global task bar.
+        completeTask('seg-a', `${resultA.n_labels} structures`);
 
         // Decode B labels and mount overlay.
         const binB = atob(resultB.labels);
@@ -738,11 +766,16 @@ const VolumetricViewer: FC<PluginViewerProps> = ({ data, controlsSlot }) => {
         setHasOverlayB(true);
         setShowOverlayBState(true);
         setInferenceStatusB({ phase: 'done', durationMs: Math.round(resultB.duration_ms) });
+        // Mark Subject B as done in the global task bar.
+        completeTask('seg-b', `${resultB.n_labels} structures`);
       })
       .catch((err) => {
         const msg = err instanceof Error ? err.message : String(err);
         setInferenceStatus({ phase: 'error', message: msg });
         setInferenceStatusB({ phase: 'error', message: msg });
+        // Report both failures to the global task bar.
+        failTask('seg-a', msg);
+        failTask('seg-b', msg);
       });
   // Intentionally only fires when hasVolumeB transitions false→true.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -853,8 +886,15 @@ const VolumetricViewer: FC<PluginViewerProps> = ({ data, controlsSlot }) => {
     }
 
     try {
+      // Register the task in the global floating task bar.
+      registerTask('seg-a', 'Segmentation — Subject A');
       setInferenceStatus({ phase: 'uploading' });
-      const result = await segmentApi.segment(volume.file!);
+      const result = await segmentApi.segment(volume.file!, {
+        // Update the global task bar upload percentage.
+        onUploadProgress: (pct) => setUploadProgress('seg-a', pct),
+        // Transition the global task bar to 'running' (server now processing).
+        onUploadComplete: () => setTaskRunning('seg-a'),
+      });
       setInferenceStatus({ phase: 'running' });
 
       const bin = atob(result.labels);
@@ -876,14 +916,19 @@ const VolumetricViewer: FC<PluginViewerProps> = ({ data, controlsSlot }) => {
       setHasOverlay(true);
       setShowOverlayState(true);
       setInferenceStatus({ phase: 'done', durationMs: Math.round(result.duration_ms) });
+      // Mark the global task as done with a summary (n_labels includes background).
+      completeTask('seg-a', `${result.n_labels} structures`);
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
       setInferenceStatus({
-        phase: 'error',
-        message: err instanceof Error ? err.message : String(err),
+        phase:   'error',
+        message: msg,
       });
+      // Report the failure to the global task bar.
+      failTask('seg-a', msg);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [volume, controls.sliceK, controls.sliceJ, controls.sliceI]);
+  }, [volume, controls.sliceK, controls.sliceJ, controls.sliceI, registerTask, setUploadProgress, setTaskRunning, completeTask, failTask]);
 
   // ── Hippocampal volumetrics — Subject A ────────────────────────────────────
   const runVolumetrics = useCallback(async () => {
@@ -964,8 +1009,13 @@ const VolumetricViewer: FC<PluginViewerProps> = ({ data, controlsSlot }) => {
     }
 
     try {
+      // Register the task in the global floating task bar.
+      registerTask('anomaly', 'Deep Sweep — Anomaly Detection');
       setAnomalyStatus({ phase: 'uploading' });
-      const result = await anomalyApi.detect(volume.file!);
+      const result = await anomalyApi.detect(volume.file!, {
+        onUploadProgress: (pct) => setUploadProgress('anomaly', pct),
+        onUploadComplete: () => setTaskRunning('anomaly'),
+      });
       setAnomalyStatus({ phase: 'running' });
 
       const bin = atob(result.mask);
@@ -984,11 +1034,15 @@ const VolumetricViewer: FC<PluginViewerProps> = ({ data, controlsSlot }) => {
       setShowAnomalyOverlayState(true);
       setNAnomalyVoxels(result.n_anomaly);
       setAnomalyStatus({ phase: 'done', durationMs: Math.round(result.duration_ms), nAnomaly: result.n_anomaly });
+      // Mark the global task as done with a summary.
+      completeTask('anomaly', `${result.n_anomaly.toLocaleString()} anomalous voxels`);
     } catch (err) {
-      setAnomalyStatus({ phase: 'error', message: err instanceof Error ? err.message : String(err) });
+      const msg = err instanceof Error ? err.message : String(err);
+      setAnomalyStatus({ phase: 'error', message: msg });
+      failTask('anomaly', msg);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [volume, controls.sliceK, controls.sliceJ, controls.sliceI, anomalyOpacity]);
+  }, [volume, controls.sliceK, controls.sliceJ, controls.sliceI, anomalyOpacity, registerTask, setUploadProgress, setTaskRunning, completeTask, failTask]);
 
   const clearAnomalyOverlay = useCallback(() => {
     const { anomalyBundle, ctx } = vtkRef.current;
@@ -1043,8 +1097,13 @@ const VolumetricViewer: FC<PluginViewerProps> = ({ data, controlsSlot }) => {
     }
 
     try {
+      // Register the task in the global floating task bar.
+      registerTask('longitudinal', 'Longitudinal Delta');
       setLongitudinalStatus({ phase: 'uploading' });
-      const result = await longitudinalApi.computeDelta(baseline, followup, transformType);
+      const result = await longitudinalApi.computeDelta(baseline, followup, transformType, {
+        onUploadProgress: (pct) => setUploadProgress('longitudinal', pct),
+        onUploadComplete: () => setTaskRunning('longitudinal'),
+      });
       setLongitudinalStatus({ phase: 'running' });
 
       const bin       = atob(result.delta);
@@ -1072,11 +1131,15 @@ const VolumetricViewer: FC<PluginViewerProps> = ({ data, controlsSlot }) => {
         nPositive:  longitudinalBundle.nPositive,
         nNegative:  longitudinalBundle.nNegative,
       });
+      // Mark the global task as done with a voxel count summary.
+      completeTask('longitudinal', `+${longitudinalBundle.nPositive.toLocaleString()} / -${longitudinalBundle.nNegative.toLocaleString()} voxels`);
     } catch (err) {
-      setLongitudinalStatus({ phase: 'error', message: err instanceof Error ? err.message : String(err) });
+      const msg = err instanceof Error ? err.message : String(err);
+      setLongitudinalStatus({ phase: 'error', message: msg });
+      failTask('longitudinal', msg);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [controls.sliceK, controls.sliceJ, controls.sliceI, longitudinalOpacity]);
+  }, [controls.sliceK, controls.sliceJ, controls.sliceI, longitudinalOpacity, registerTask, setUploadProgress, setTaskRunning, completeTask, failTask]);
 
   const clearLongitudinalOverlay = useCallback(() => {
     const { longitudinalBundle, ctx } = vtkRef.current;
@@ -1094,6 +1157,29 @@ const VolumetricViewer: FC<PluginViewerProps> = ({ data, controlsSlot }) => {
     setNNegative(0);
     setLongitudinalStatus({ phase: 'idle' });
   }, []);
+
+  // ── Neural decoding wrapper with task progress ───────────────────────────────
+  // Wraps _runNeuralDecoding (from useNeuralDecoding) to register a task in the
+  // global floating task bar and report success / failure via completeTask /
+  // failTask.  The hook's runNeuralDecoding now rethrows on error so this
+  // try/catch can call failTask() with the correct message.
+  const runNeuralDecoding = useCallback(async (req: DecodingRequest): Promise<void> => {
+    // Register the task so the GlobalTaskBar shows a card immediately.
+    registerTask('decoding', 'Neural Decoding (MVPA)');
+    try {
+      // Pass upload-progress callbacks into the underlying hook function.
+      await _runNeuralDecoding(req, {
+        onUploadProgress: (pct) => setUploadProgress('decoding', pct),
+        onUploadComplete: () => setTaskRunning('decoding'),
+      });
+      // The hook sets its own 'done' state; we also complete the global task.
+      completeTask('decoding');
+    } catch (err) {
+      // The hook already set its own 'error' state; we report to the global bar.
+      failTask('decoding', err instanceof Error ? err.message : String(err));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [_runNeuralDecoding, registerTask, setUploadProgress, setTaskRunning, completeTask, failTask]);
 
   // ── Context values ──────────────────────────────────────────────────────────
 

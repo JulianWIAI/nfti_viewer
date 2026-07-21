@@ -34,6 +34,12 @@ import LongitudinalPanel from './LongitudinalPanel';
 import SubjectBDropZone from './SubjectBDropZone';
 import VolumetricsChart from './VolumetricsChart';
 
+// ── Progress bar imports ──────────────────────────────────────────────────────
+// InlineTaskProgress renders a thin bar inside each panel section.
+// useTaskProgress provides the uploadPct value for the global task entries.
+import InlineTaskProgress from '../../components/progress/InlineTaskProgress';
+import { useTaskProgress } from '../../contexts/TaskProgressContext';
+
 // ── Reusable slider row ───────────────────────────────────────────────────────
 
 interface SliderRowProps {
@@ -84,6 +90,11 @@ const VolumetricControls: FC<PluginControlsProps> = () => {
     inferenceStatusB, hasOverlayB, showOverlayB, setShowOverlayB,
     volumetricsB, volumetricsLoadingB, volumetricsErrorB, runVolumetricsB,
   } = useComparisonContext();
+
+  // ── Global task progress — used to read uploadPct for inline bars ──────────
+  // We read the task entries directly so InlineTaskProgress gets accurate
+  // uploadPct values from the global registry rather than the local status.
+  const { tasks } = useTaskProgress();
 
   const isRunning = inferenceStatus.phase === 'uploading' || inferenceStatus.phase === 'running';
 
@@ -136,6 +147,11 @@ const VolumetricControls: FC<PluginControlsProps> = () => {
           <span className={`status-dot ${dotClass(inferenceStatus)}`} />
           <span>{statusLabel(inferenceStatus)}</span>
         </div>
+        {/* Inline progress bar — shown during uploading / running phases */}
+        <InlineTaskProgress
+          phase={inferenceStatus.phase}
+          uploadPct={tasks.get('seg-a')?.uploadPct ?? 0}
+        />
         {/* Manual single-subject run — available when B is NOT loaded */}
         {!hasVolumeB && (
           <button className="btn btn--primary"
@@ -190,6 +206,11 @@ const VolumetricControls: FC<PluginControlsProps> = () => {
               <span className={`status-dot ${dotClass(inferenceStatusB)}`} />
               <span>{statusLabel(inferenceStatusB)}</span>
             </div>
+            {/* Inline progress bar for Subject B segmentation */}
+            <InlineTaskProgress
+              phase={inferenceStatusB.phase}
+              uploadPct={tasks.get('seg-b')?.uploadPct ?? 0}
+            />
             {hasOverlayB && (
               <div className="control-row control-row--toggle" style={{ marginTop: 8 }}>
                 <label className="control-label" htmlFor="seg-show-b">Show overlay</label>

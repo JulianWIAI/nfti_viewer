@@ -75,9 +75,23 @@ def load_nifti(content: bytes):  # → nib.Nifti1Image
     """
     check_dependencies()
 
+    def _relaxed_load(loader, *args, **kwargs):
+        """Retry with a relaxed quaternion threshold on w2 precision errors."""
+        try:
+            return loader(*args, **kwargs)
+        except ValueError as exc:
+            if "w2 should be positive" not in str(exc):
+                raise
+            old = nib.Nifti1Header.quaternion_threshold
+            try:
+                nib.Nifti1Header.quaternion_threshold = -1e-6
+                return loader(*args, **kwargs)
+            finally:
+                nib.Nifti1Header.quaternion_threshold = old
+
     # ── Fast path: in-memory deserialisation ──────────────────────────────────
     try:
-        return nib.Nifti1Image.from_bytes(content)   # type: ignore[union-attr]
+        return _relaxed_load(nib.Nifti1Image.from_bytes, content)   # type: ignore[union-attr]
     except (AttributeError, Exception):
         pass   # nibabel < 4.0 or .nii.gz — fall through to temp file
 
@@ -87,7 +101,7 @@ def load_nifti(content: bytes):  # → nib.Nifti1Image
         tmp.write(content)
         tmp.flush()
         tmp.close()
-        return nib.load(tmp.name)   # type: ignore[union-attr]
+        return _relaxed_load(nib.load, tmp.name)   # type: ignore[union-attr]
     finally:
         Path(tmp.name).unlink(missing_ok=True)
 

@@ -1,0 +1,350 @@
+/**
+ * progress.css — Styles for GlobalTaskBar and InlineTaskProgress
+ * ────────────────────────────────────────────────────────────────
+ *
+ * Uses only CSS custom properties already defined in App.css / index.css
+ * so the dark medical theme is applied automatically:
+ *
+ *   --bg-panel      panel background
+ *   --bg-section    card / section background
+ *   --border        border colour
+ *   --text-primary  primary text
+ *   --text-secondary secondary / muted text
+ *   --accent-green  green accent (success, done, uploading bar)
+ *   --accent-red    red accent (error bar)
+ *   --space-1       4px
+ *   --space-2       8px
+ *   --space-3       12px
+ *   --space-4       16px
+ *
+ * ── ANIMATION: shimmer ───────────────────────────────────────────────────────
+ * The indeterminate "running" bar uses a CSS @keyframes animation.
+ * The shimmer is implemented as a pseudo-element gradient sliding from
+ * left to right, which works in all browsers including Edge on Windows.
+ *
+ * ── ANIMATION: done-flash ────────────────────────────────────────────────────
+ * On task completion the bar briefly flashes brighter green before the
+ * task card disappears (driven by the 3 s auto-dismiss in TaskProgressContext).
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   KEYFRAME ANIMATIONS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Shimmer animation for the indeterminate "running" bar.
+ * A bright highlight slides from -100% to 200% of the bar width,
+ * creating a looping sweep effect.
+ * Uses standard CSS `background-position` animation — works on all browsers.
+ */
+@keyframes progress-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+/**
+ * Flash animation played when a task reaches 'done'.
+ * Briefly increases the bar opacity to draw the user's eye,
+ * then fades back to the normal green.
+ */
+@keyframes progress-done-flash {
+  0%   { opacity: 1; }
+  40%  { opacity: 0.4; }
+  70%  { opacity: 1; }
+  100% { opacity: 0.8; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GLOBAL TASK BAR
+   Fixed panel docked to the bottom-right corner of the viewport.
+   Shows all active tasks; disappears when there are no tasks.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Outer container — fixed positioning so it floats over the VTK canvas.
+ * z-index 1000 puts it above all plugin content.
+ */
+.global-task-bar {
+  /* Fixed to the viewport — not scrolled with page content */
+  position: fixed;
+  bottom: var(--space-4, 16px);
+  right:  var(--space-4, 16px);
+
+  /* Constrained width so cards do not grow too wide */
+  width: 300px;
+
+  /* Scrollable if many tasks are queued */
+  max-height: 400px;
+  overflow-y: auto;
+
+  /* Stack cards vertically */
+  display:        flex;
+  flex-direction: column;
+  gap:            var(--space-2, 8px);
+
+  /* Depth: sits above VTK canvas and sidebar */
+  z-index: 1000;
+
+  /* Allow pointer events to pass through the transparent gap between cards */
+  pointer-events: none;
+}
+
+/* ── Individual task card ──────────────────────────────────────────────────── */
+
+/**
+ * Each task entry is a card with a label row, progress bar, and
+ * optional message / error row.
+ */
+.task-card {
+  /* Re-enable pointer events so dismiss button is clickable */
+  pointer-events: auto;
+
+  /* Use the panel background from the dark theme */
+  background:    var(--bg-panel, #1a1a2e);
+  border:        1px solid var(--border, #2a2a4a);
+  border-radius: 6px;
+  padding:       var(--space-2, 8px) var(--space-3, 12px);
+
+  /* Subtle elevation so the card floats over the canvas */
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+
+  /* Smooth appearance when a new task is added */
+  animation: task-card-in 0.2s ease-out;
+}
+
+/** Slide-in animation for new task cards. */
+@keyframes task-card-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+/* ── Card header row (label + phase icon) ─────────────────────────────────── */
+
+/** Row containing the task label text and the phase icon on the right. */
+.task-card__header {
+  display:         flex;
+  justify-content: space-between;
+  align-items:     center;
+  margin-bottom:   var(--space-1, 4px);
+}
+
+/** Task label — truncated with ellipsis if too long. */
+.task-card__label {
+  font-size:   11px;
+  font-weight: 600;
+  color:       var(--text-primary, #e0e0f0);
+  white-space: nowrap;
+  overflow:    hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  margin-right: var(--space-1, 4px);
+}
+
+/**
+ * Phase icon badge — small text symbol to the right of the label.
+ * Different colour per phase so the user can scan quickly.
+ */
+.task-card__icon {
+  font-size:  12px;
+  flex-shrink: 0;
+}
+
+/* Phase-specific icon colours */
+.task-card__icon--uploading { color: var(--accent-green, #4caf7d); }
+.task-card__icon--running   { color: #64b5f6; /* light blue */      }
+.task-card__icon--done      { color: var(--accent-green, #4caf7d); }
+.task-card__icon--error     { color: var(--accent-red,   #e05252); }
+
+/* ── Progress bar track ───────────────────────────────────────────────────── */
+
+/**
+ * The track is the full-width container for the progress fill / shimmer.
+ * height: 6px — slightly thicker in the floating card for visibility.
+ */
+.task-card__bar-track {
+  width:         100%;
+  height:        6px;
+  background:    var(--bg-section, #12122a);
+  border-radius: 3px;
+  overflow:      hidden;  /* clips the fill / shimmer inside the rounded track */
+  position:      relative;
+}
+
+/* ── Determinate fill (uploading phase) ───────────────────────────────────── */
+
+/**
+ * Green fill that expands from 0% to 100% as bytes are sent.
+ * transition: width 0.2s ensures smooth movement between progress updates.
+ */
+.task-card__bar-fill {
+  height:        100%;
+  border-radius: 3px;
+
+  /* Smooth width transitions between progress-event updates */
+  transition:    width 0.2s ease;
+}
+
+/* Colour variants by phase */
+.task-card__bar-fill--uploading {
+  background: var(--accent-green, #4caf7d);
+}
+
+.task-card__bar-fill--done {
+  /* Full-width green bar with a flash animation */
+  background: var(--accent-green, #4caf7d);
+  width: 100% !important;
+  animation: progress-done-flash 0.6s ease-out forwards;
+}
+
+.task-card__bar-fill--error {
+  /* Full-width red bar for error state */
+  background: var(--accent-red, #e05252);
+  width: 100% !important;
+}
+
+/* ── Indeterminate shimmer (running phase) ────────────────────────────────── */
+
+/**
+ * During the 'running' phase the server is processing but we have no byte
+ * progress to show.  We render an animated shimmer bar instead.
+ *
+ * The shimmer uses a linear-gradient where the bright center highlight
+ * moves from left to right, looping continuously.
+ *
+ * background-size: 200% ensures the gradient is wider than the bar so the
+ * sweep has room to travel.
+ */
+.task-card__bar-shimmer {
+  position: absolute;
+  inset:    0;  /* fill the track completely */
+
+  /* Wide gradient: dark green → bright highlight → dark green */
+  background: linear-gradient(
+    90deg,
+    var(--bg-section, #12122a) 0%,
+    rgba(76, 175, 125, 0.3)    30%,
+    rgba(76, 175, 125, 0.8)    50%,
+    rgba(76, 175, 125, 0.3)    70%,
+    var(--bg-section, #12122a) 100%
+  );
+  background-size: 200% 100%;
+
+  /* Drive the highlight position with the shimmer keyframe */
+  animation: progress-shimmer 1.4s linear infinite;
+}
+
+/* ── Upload percentage text ───────────────────────────────────────────────── */
+
+/**
+ * Shown below the bar during 'uploading', e.g. "47%".
+ * Hidden in other phases.
+ */
+.task-card__pct {
+  font-size:  10px;
+  color:      var(--text-secondary, #888);
+  margin-top: 2px;
+  text-align: right;
+}
+
+/* ── Optional message row (done summary or error text) ───────────────────── */
+
+/** Shown below the bar when the task has a message (done or error). */
+.task-card__message {
+  font-size:  10px;
+  margin-top: var(--space-1, 4px);
+}
+
+.task-card__message--done  { color: var(--accent-green, #4caf7d); }
+.task-card__message--error { color: var(--accent-red,   #e05252); }
+
+/* ── Dismiss button (error cards only) ───────────────────────────────────── */
+
+/**
+ * Small inline dismiss "×" button for error task cards.
+ * Positioned as a flex row below the error message.
+ */
+.task-card__dismiss {
+  display:       block;
+  margin-top:    var(--space-1, 4px);
+  padding:       2px 6px;
+  font-size:     10px;
+  border:        1px solid var(--accent-red, #e05252);
+  border-radius: 3px;
+  background:    transparent;
+  color:         var(--accent-red, #e05252);
+  cursor:        pointer;
+  line-height:   1.4;
+  transition:    background 0.15s;
+}
+
+.task-card__dismiss:hover {
+  background: rgba(224, 82, 82, 0.15);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INLINE TASK PROGRESS
+   A thin 4px bar embedded directly inside panel sections (AnomalyPanel,
+   LongitudinalPanel, DecodingPanel, VolumetricControls).
+   Shown only during 'uploading' or 'running' — hidden otherwise.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Wrapper div that sits full-width inside its parent section.
+ * margin-top provides a small gap below the status row above it.
+ */
+.inline-task-progress {
+  width:         100%;
+  margin-top:    var(--space-1, 4px);
+  margin-bottom: var(--space-1, 4px);
+}
+
+/**
+ * Track: the background container for the fill / shimmer.
+ * Thinner than the GlobalTaskBar track (4px) for a subtler inline look.
+ */
+.inline-task-progress__track {
+  width:         100%;
+  height:        4px;
+  background:    var(--bg-section, #12122a);
+  border-radius: 2px;
+  overflow:      hidden;
+  position:      relative;
+}
+
+/**
+ * Determinate fill — used during 'uploading'.
+ * Width is driven inline via style prop: style={{ width: `${pct}%` }}.
+ */
+.inline-task-progress__fill {
+  height:        100%;
+  border-radius: 2px;
+  transition:    width 0.2s ease;
+  background:    var(--accent-green, #4caf7d);
+}
+
+/** Error fill — full-width red bar shown during 'error' phase. */
+.inline-task-progress__fill--error {
+  background: var(--accent-red, #e05252);
+  width: 100% !important;
+}
+
+/**
+ * Indeterminate shimmer — used during 'running'.
+ * Identical gradient and animation to the GlobalTaskBar shimmer but
+ * sized to the thinner 4px track.
+ */
+.inline-task-progress__shimmer {
+  position: absolute;
+  inset:    0;
+
+  background: linear-gradient(
+    90deg,
+    var(--bg-section, #12122a) 0%,
+    rgba(76, 175, 125, 0.3)    30%,
+    rgba(76, 175, 125, 0.8)    50%,
+    rgba(76, 175, 125, 0.3)    70%,
+    var(--bg-section, #12122a) 100%
+  );
+  background-size: 200% 100%;
+  animation: progress-shimmer 1.4s linear infinite;
+}
