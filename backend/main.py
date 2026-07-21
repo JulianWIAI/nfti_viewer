@@ -68,6 +68,8 @@ from routers.tractography      import router as _tractography_router
 from routers.anomaly_detection import router as _anomaly_router
 from routers.longitudinal      import router as _longitudinal_router
 from routers.registration      import router as _registration_router
+from routers.meg_source_estimate import router as _meg_source_router
+from routers.bids_events         import router as _bids_events_router
 
 # ── Optional heavy deps (segmentation only) ───────────────────────────────────
 try:
@@ -166,6 +168,8 @@ app.include_router(_tractography_router)      # POST /api/dti/tractography      
 app.include_router(_anomaly_router)           # POST /api/anomalies/detect      (file-upload, full pipeline)
 app.include_router(_longitudinal_router)      # POST /api/longitudinal/delta    (two-file upload, registration + subtraction)
 app.include_router(_registration_router)      # POST /api/registration/syn      (two-file upload, affine + SyN warp)
+app.include_router(_meg_source_router)        # POST /api/meg/source-estimate   (MEG cortical source estimation)
+app.include_router(_bids_events_router)       # POST /api/bids/events/upload  GET /api/bids/events
 
 # Suppress verbose MNE console output
 mne.set_log_level("WARNING")

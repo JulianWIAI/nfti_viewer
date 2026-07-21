@@ -2414,3 +2414,942 @@ input[type="checkbox"]:disabled {
   text-align: center;
   max-width: 240px;
 }
+
+/* ── Multimodal Workspace (fMRI + MEG split view) ──────────────────────────── */
+
+/* Outer wrapper — fills the host Viewer.tsx content area */
+.multimodal-workspace {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-app);
+}
+
+/* Horizontal split: fMRI left | MEG right */
+.multimodal-workspace__panels {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  gap: 2px;
+}
+
+/* Bottom time scrubber bar */
+.multimodal-workspace__timebar {
+  flex-shrink: 0;
+  height: 40px;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+}
+
+/* Individual panel (fMRI or MEG) */
+.multimodal-panel {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-app);
+}
+
+/* vtk.js canvas target — fills the panel */
+.multimodal-panel__canvas {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Empty-state hint shown before a file is loaded */
+.multimodal-panel__empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.multimodal-panel__empty p {
+  font-size: 12px;
+  color: var(--text-hint);
+  text-align: center;
+  max-width: 200px;
+  line-height: 1.5;
+}
+
+/* Right-edge sidebar for fMRI controls */
+.multimodal-sidebar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--panel-width);
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+  padding: 12px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* MEG panel navigation bar (pan buttons + time label) */
+.meg-panel__nav {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border);
+}
+
+.meg-panel__time-label {
+  flex: 1;
+  text-align: center;
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+/* ── TimeSlider (fMRI scrubber) ────────────────────────────────────────────── */
+
+.time-slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+/* Play / Pause button */
+.time-slider__play-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-section);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.time-slider__play-btn:hover:not(:disabled) {
+  background: var(--bg-panel-alt);
+}
+
+.time-slider__play-btn--active {
+  border-color: var(--accent-green);
+  color: var(--accent-green);
+}
+
+.time-slider__play-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Scrubber range input */
+.time-slider__range {
+  flex: 1;
+  height: 4px;
+  accent-color: var(--accent-green);
+}
+
+/* Time / volume label */
+.time-slider__label {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+/* ── EventTimelineRibbon ─────────────────────────────────────────────────────── */
+
+/* Outer wrapper — full-width horizontal strip below the split panels */
+.event-timeline-ribbon {
+  width: 100%;
+  background: #0d0d1a;
+  border-top: 1px solid var(--border);
+  padding: 6px 12px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* Ruler track — chips are absolutely positioned relative to this */
+.event-timeline-ribbon__track {
+  position: relative;
+  width: 100%;
+  height: 16px;
+  background: #1a1a2e;
+  border-radius: 3px;
+}
+
+/* Individual event chip — a small circle or rectangle */
+.event-timeline-chip {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.1s ease, border-color 0.1s ease;
+}
+
+.event-timeline-chip:hover {
+  transform: translate(-50%, -50%) scale(1.6);
+  z-index: 2;
+}
+
+/* Active chip — ring highlight showing current position */
+.event-timeline-chip--active {
+  border-color: #ffffff;
+  transform: translate(-50%, -50%) scale(1.4);
+  z-index: 1;
+}
+
+/* Legend row beneath the ruler */
+.event-timeline-ribbon__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.event-timeline-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.event-timeline-legend-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ── TSV drop zone (BIDS events loader in the sidebar) ───────────────────────── */
+
+.tsv-dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  border: 1.5px dashed var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  background: transparent;
+}
+
+.tsv-dropzone--over {
+  border-color: var(--accent-blue);
+  background: rgba(64, 169, 255, 0.07);
+}
+
+.tsv-dropzone__label {
+  font-size: 10px;
+  color: var(--text-hint);
+  pointer-events: none;
+  user-select: none;
+}
+
+.tsv-dropzone__label--loaded {
+  color: var(--accent-green);
+}
+
+/* ── Multimodal workspace header bar ─────────────────────────────────────────── */
+
+.multimodal-workspace__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 12px;
+  background: #0c0c18;
+  border-bottom: 1px solid #1e1e2e;
+  flex-shrink: 0;
+}
+
+.multimodal-workspace__header-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Reference panel toggle button */
+.ref-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  background: #1a1a2e;
+  border: 1px solid #2a2a44;
+  border-radius: 5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.ref-toggle-btn:hover {
+  background: #22223a;
+  color: var(--text-primary);
+}
+
+.ref-toggle-btn--active {
+  background: #1e1e3e;
+  border-color: #5555aa;
+  color: #aaaaff;
+}
+
+/* ── ReferenceDrawer ─────────────────────────────────────────────────────────── */
+
+/* The drawer slides in from the right edge of the viewport.
+   It is fixed so it overlays without disrupting the vtk.js layout. */
+.ref-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 400px;
+  max-width: 90vw;
+  background: #080811;
+  border-left: 1px solid #1a1a2e;
+  display: flex;
+  flex-direction: column;
+  z-index: 200;
+  transform: translateX(100%);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.6);
+}
+
+.ref-drawer--open {
+  transform: translateX(0);
+}
+
+/* Drawer header */
+.ref-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #0d0d1a;
+  border-bottom: 1px solid #1a1a2e;
+  flex-shrink: 0;
+}
+
+.ref-drawer__title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #c8c8e8;
+  letter-spacing: 0.02em;
+}
+
+.ref-drawer__title-icon {
+  font-size: 15px;
+}
+
+.ref-drawer__close {
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px solid #2a2a44;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.ref-drawer__close:hover {
+  background: #2a2a44;
+  color: var(--text-primary);
+}
+
+/* Tabs */
+.ref-drawer__tabs {
+  display: flex;
+  border-bottom: 1px solid #1a1a2e;
+  flex-shrink: 0;
+}
+
+.ref-tab {
+  flex: 1;
+  padding: 8px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-hint);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.ref-tab--active {
+  color: #aaaaff;
+  border-bottom-color: #5555aa;
+}
+
+.ref-tab:hover:not(.ref-tab--active) {
+  color: var(--text-secondary);
+}
+
+/* Search bar */
+.ref-drawer__search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #0a0a14;
+  border-bottom: 1px solid #1a1a2e;
+  flex-shrink: 0;
+}
+
+.ref-drawer__search-icon {
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.ref-drawer__search {
+  flex: 1;
+  background: #111122;
+  border: 1px solid #22223a;
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 11px;
+  padding: 4px 8px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.ref-drawer__search:focus {
+  border-color: #5555aa;
+}
+
+.ref-drawer__search::-webkit-search-cancel-button {
+  display: none; /* use our own clear button */
+}
+
+.ref-drawer__search-clear {
+  padding: 2px 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-hint);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+/* Scrollable body */
+.ref-drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0 24px;
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a44 transparent;
+}
+
+.ref-drawer__body::-webkit-scrollbar       { width: 5px; }
+.ref-drawer__body::-webkit-scrollbar-track { background: transparent; }
+.ref-drawer__body::-webkit-scrollbar-thumb { background: #2a2a44; border-radius: 3px; }
+
+/* Section heading (MEG tab) */
+.ref-section-heading {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6666aa;
+  padding: 10px 14px 4px;
+  border-top: 1px solid #1a1a2e;
+}
+
+/* Empty state */
+.ref-empty {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-hint);
+  font-style: italic;
+}
+
+/* ── Anatomy accordion — Group level ────────────────────────────────────────── */
+
+.ref-group {
+  border-bottom: 1px solid #1a1a2e;
+}
+
+.ref-group__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #0e0e1c;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s ease;
+}
+
+.ref-group__header:hover,
+.ref-group__header--open {
+  background: #141428;
+}
+
+.ref-group__icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.ref-group__label {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 700;
+  color: #c0c0e0;
+  letter-spacing: 0.02em;
+}
+
+.ref-group__count {
+  font-size: 9px;
+  color: #5555aa;
+  background: #1a1a2e;
+  border-radius: 10px;
+  padding: 1px 6px;
+}
+
+.ref-group__arrow {
+  font-size: 10px;
+  color: var(--text-hint);
+  flex-shrink: 0;
+}
+
+/* Group body — max-height trick for smooth open/close */
+.ref-group__body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ref-group__body--open {
+  max-height: 4000px;
+}
+
+.ref-group__desc {
+  padding: 6px 14px 8px;
+  font-size: 10px;
+  color: #6666aa;
+  line-height: 1.5;
+  border-bottom: 1px solid #111120;
+}
+
+/* ── Anatomy accordion — Region level ──────────────────────────────────────── */
+
+.ref-region {
+  border-top: 1px solid #111120;
+}
+
+/* Highlight ring when navigated from 3D click */
+.ref-region--highlighted {
+  box-shadow: inset 3px 0 0 var(--highlight-color, #5555aa);
+  background: rgba(85, 85, 170, 0.06);
+}
+
+.ref-region__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 8px 22px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s ease;
+}
+
+.ref-region__header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* FreeSurfer colour swatch — matches vtk.js overlay pixel-for-pixel */
+.ref-region__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.ref-region__name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #d0d0f0;
+  flex-shrink: 0;
+  min-width: 120px;
+}
+
+.ref-region__fn {
+  font-size: 9px;
+  color: #5a5a8a;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ref-region__chevron {
+  font-size: 9px;
+  color: var(--text-hint);
+  flex-shrink: 0;
+}
+
+/* Expandable region detail */
+.ref-region__body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.ref-region__body--open {
+  max-height: 600px;
+}
+
+.ref-region__detail {
+  padding: 6px 22px 8px;
+  font-size: 10px;
+  line-height: 1.65;
+  color: #9090b8;
+}
+
+.ref-region__labels {
+  padding: 0 22px 10px;
+  font-size: 9px;
+  color: #4a4a7a;
+}
+
+.ref-label-badge {
+  display: inline-block;
+  background: #1a1a2e;
+  border: 1px solid #2a2a44;
+  border-radius: 3px;
+  padding: 0 4px;
+  margin: 0 2px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: #7a7aaa;
+}
+
+/* ── MEG / Electrophysiology tab items ──────────────────────────────────────── */
+
+.ref-meg-band {
+  border-bottom: 1px solid #1a1a2e;
+}
+
+.ref-meg-band__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s ease;
+}
+
+.ref-meg-band__header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ref-meg-band__label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #b0b0d8;
+  min-width: 68px;
+  flex-shrink: 0;
+}
+
+.ref-meg-band__range {
+  font-size: 10px;
+  color: #5555aa;
+  font-family: var(--font-mono);
+  min-width: 56px;
+  flex-shrink: 0;
+}
+
+.ref-meg-band__fn {
+  font-size: 9px;
+  color: #5a5a8a;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ref-meg-band__chevron {
+  font-size: 9px;
+  color: var(--text-hint);
+  flex-shrink: 0;
+}
+
+.ref-meg-band__body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.ref-meg-band__body--open {
+  max-height: 1200px;
+}
+
+.ref-meg-band__detail {
+  padding: 4px 14px 12px;
+  font-size: 10px;
+  line-height: 1.65;
+  color: #8888b0;
+}
+
+/* ── ERP wave cards ─────────────────────────────────────────────────────────── */
+
+.ref-erp-wave {
+  margin: 6px 14px 10px;
+  padding: 10px 12px;
+  background: #0d0d1e;
+  border: 1px solid #1e1e30;
+  border-radius: 6px;
+}
+
+.ref-erp-wave__title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #a0a0d0;
+  margin-bottom: 8px;
+}
+
+.ref-erp-wave__meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 10px;
+}
+
+.ref-erp-wave__meta dt {
+  font-size: 9px;
+  font-weight: 700;
+  color: #5555aa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  padding-top: 1px;
+}
+
+.ref-erp-wave__meta dd {
+  font-size: 10px;
+  color: #7878a8;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── Frequency band quick-nav badges (TimeseriesControls) ───────────────────── */
+
+.ts-freq-badges {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.ts-freq-badge {
+  flex: 1 1 auto;
+  min-width: 28px;
+  height: 28px;
+  background: #1a1a2e;
+  border: 1px solid #2e2e50;
+  border-radius: 4px;
+  color: #8888cc;
+  font-size: 14px;
+  font-style: italic;
+  font-family: 'Georgia', serif;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.ts-freq-badge:hover {
+  background: #252545;
+  border-color: #5555aa;
+  color: #b0b0f0;
+}
+
+/* ── Reference toggle in global app header ───────────────────────────────────── */
+
+/* Pushes the reference toggle to the far right of the app header */
+.app-header .ref-toggle-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ── Search highlight mark ────────────────────────────────────────────────────── */
+/* Applied by <Highlight> to every occurrence of the search query in the drawer.  */
+
+.ref-highlight {
+  background: rgba(255, 214, 0, 0.32);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+  /* Subtle box shadow so the mark is visible on both light and dark segments */
+  box-shadow: 0 0 0 1px rgba(255, 214, 0, 0.18);
+}
+
+/* ── MEG viewer nav bar (pan arrows + jump-to-time) ──────────────────────────── */
+
+.meg-viewer__nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--bg-panel-alt, #161616);
+  border-top: 1px solid var(--border, #2a2a2a);
+  flex-shrink: 0;
+}
+
+.meg-viewer__pan-btn {
+  font-size: 12px;
+  padding: 2px 8px;
+  min-width: 28px;
+}
+
+.meg-viewer__jump {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.meg-viewer__jump-input {
+  width: 72px;
+  padding: 2px 6px;
+  background: var(--bg-section, #1e1e1e);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 3px;
+  color: var(--text-primary, #e8e8e8);
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  text-align: right;
+}
+
+.meg-viewer__jump-input:focus {
+  outline: none;
+  border-color: var(--accent-blue, #40a9ff);
+}
+
+/* Remove browser spin arrows from the number input */
+.meg-viewer__jump-input::-webkit-outer-spin-button,
+.meg-viewer__jump-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+.meg-viewer__jump-input[type=number] {
+  -moz-appearance: textfield;
+}
+
+.meg-viewer__jump-unit {
+  font-size: 11px;
+  color: var(--text-secondary, #8a8a8a);
+}
+
+.meg-viewer__time-range {
+  flex: 1;
+  text-align: center;
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-secondary, #8a8a8a);
+}
+
+/* ── MEG event-marker hover tooltip ───────────────────────────────────────────── */
+
+.meg-event-tooltip {
+  position: absolute;
+  pointer-events: none;
+  z-index: 200;
+  background: rgba(16, 16, 28, 0.92);
+  border: 1px solid rgba(180, 180, 220, 0.25);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-primary, #e8e8e8);
+  line-height: 1.6;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.meg-event-tooltip__type {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+/* ── MEG vertical scrollbar (MegVerticalScrollbar.tsx) ───────────────────────── */
+
+/* Track — the full-height strip on the right edge of the canvas container */
+.meg-vscroll {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  z-index: 20;
+  user-select: none;
+  /* Prevent the scrollbar from accidentally capturing wheel events meant for
+     the canvas — the canvas onWheel handler already calls e.preventDefault(). */
+  pointer-events: auto;
+}
+
+/* Thumb — the draggable indicator showing the current scroll position */
+.meg-vscroll__thumb {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  background: rgba(160, 160, 220, 0.30);
+  border-radius: 4px;
+  cursor: grab;
+  transition: background 0.12s ease;
+  /* Top offset applied via inline transform: translateY(...px) in the component */
+}
+
+.meg-vscroll__thumb:hover {
+  background: rgba(160, 160, 220, 0.50);
+}
+
+.meg-vscroll__thumb:active {
+  cursor: grabbing;
+  background: rgba(160, 160, 220, 0.70);
+}

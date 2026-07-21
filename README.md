@@ -4,6 +4,13 @@ A multi-modal neuroimaging platform for interactive visualisation and analysis o
 
 ---
 
+> **AI Disclosure**
+> This project was developed with the assistance of [Claude](https://claude.ai) (Anthropic), an AI coding assistant.
+> All architecture decisions, feature specifications, and implementation direction were provided by the author.
+> Claude assisted with code generation, debugging, and documentation throughout the development process.
+
+---
+
 ## Screenshots
 
 <p align="center">
@@ -59,11 +66,25 @@ A multi-modal neuroimaging platform for interactive visualisation and analysis o
 - Recording metadata display
 
 ### MEG Viewer
-- Loads **BrainVision MEG** data via a FastAPI / MNE-Python backend
-- Same waveform canvas as the EEG viewer
-- **Artifact detection** — MNE EOG and muscle artifact spans highlighted in the waveform
+- Loads **Elekta/MEGIN TRIUX .fif** files via a FastAPI / MNE-Python backend
+- Stacked waveform canvas with min/max envelope ribbons — streams decimated chunks on demand
+- **Semantic channel colours** — magnetometers in sky-blue, planar gradiometers in green (replaces arbitrary rainbow palette)
+- **Channel hover tooltip** — hover any channel label to see type (Magnetometer / Planar Gradiometer), physical unit, sensor pod number, and the sibling channels sharing that pod
+- **Vertical scroll** — mouse-wheel or drag the scrollbar thumb to scroll through any number of selected channels; a proportional thumb appears automatically when lanes overflow the canvas
+- **Band power mini-bars** — five 4 px bars (δ θ α β γ) rendered in each lane's label column using a client-side Hann-windowed DFT, giving an at-a-glance spectral fingerprint per channel
+- **Spectral lane tint** — toggle "Tint: ON" in the controls sidebar to paint each lane's background with its sliding-window dominant frequency band colour (STFT, 75 % overlap); the colour transitions show exactly where one oscillation ends and the next begins
+- **BIDS events overlay** — drag a `*_events.tsv` file onto the sidebar drop-zone to paint trial onset markers, duration shading, and trial-type labels directly on the waveform canvas
+- **Artifact detection** — MNE EOG and muscle artifact spans highlighted in amber / grey
 - **Spike detection** — 20 Hz high-pass filter + MAD thresholding; spike markers overlaid in red
-- **Frequency band dashboard** — relative δ / θ / α / β / γ power as a horizontal bar chart (Welch PSD)
+- **Frequency band dashboard** — relative δ / θ / α / β / γ power as a horizontal bar chart (Welch PSD, server-side)
+- **Topomap** — average magnetic field map over the current time window rendered in the sidebar
+- **MEG source estimate** — minimum-norm inverse solution available via the backend
+
+### Multi-modal Workspace
+- Simultaneous **MEG waveform** (MegPanel) and **fMRI BOLD volume** (FmriPanel) in a split-panel layout
+- Canvas click in the MEG panel writes `currentTimeSec` to a shared SyncContext; the fMRI pane snaps to the corresponding BOLD volume index
+- A synced cursor line tracks the active time position across both panels
+- MEG panel inherits all waveform features: vertical scroll, band power bars, spectral lane tint toggle, BIDS event markers
 
 ### fNIRS Viewer
 - Loads **SNIRF v1.0** files via h5wasm (full HDF5 C library compiled to WASM)
@@ -126,7 +147,7 @@ Drag and drop any of the following file types onto the upload area:
 |---|---|
 | `.nii`, `.nii.gz` | MRI / PET grid viewer |
 | `.vhdr` (+ `.eeg` + `.vmrk`) | EEG waveform viewer |
-| `.vhdr` (MEG) | MEG waveform viewer |
+| `.fif` | MEG waveform viewer (Elekta/MEGIN TRIUX) |
 | `.snirf` | fNIRS viewer |
 
 ### Running segmentation
@@ -158,17 +179,27 @@ src/
 │   ├── volumetric/     # MRI/PET viewer + split-screen comparison
 │   ├── dualViewer/     # SyN registration viewer
 │   ├── eeg/            # EEG waveform viewer
-│   ├── meg/            # MEG waveform viewer
+│   ├── meg/            # MEG waveform viewer + scrollbar
+│   ├── multimodal/     # MEG + fMRI split-panel workspace
 │   └── nirs/           # fNIRS viewer
-├── lib/vtk/            # vtk.js actor builders, segmentation overlay, LUT
+├── lib/
+│   ├── vtk/            # vtk.js actor builders, segmentation overlay, LUT, fMRI BOLD renderer
+│   └── meg/            # Client-side MEG signal processing
+│       ├── channelColors.ts    # Type-based channel colours (mag/grad) + sensor pod parsing
+│       ├── bandPower.ts        # Hann-windowed DFT, per-band power, colours and labels
+│       └── laneSpectrogram.ts  # STFT sliding-window dominant-band analysis (BandSegment[])
+├── contexts/           # SyncContext — shared time cursor for multimodal workspace
 ├── workers/            # Web Workers for NIfTI, EDF, SNIRF parsing
-├── services/           # API clients (segment, SyN, MEG analysis, EEG)
-├── components/         # Shared UI (AnatomySelector, charts, drop zones)
+├── services/           # API clients (segment, SyN, MEG analysis, EEG, BIDS events)
+├── components/         # Shared UI (AnatomySelector, ReferenceDrawer, FrequencyDashboard, MegTopomap …)
 └── types/              # Shared TypeScript types
 
 backend/
-├── main.py             # FastAPI app — segmentation, MEG/EEG endpoints
-├── mri_analysis.py     # Hippocampal volumetrics router
-├── meg_analysis.py     # Artifact detection, spike detection, frequency bands
-└── download_models.py  # SynthSeg ONNX model download helper
+├── main.py                      # FastAPI app — all routers registered here
+├── mri_analysis.py              # Hippocampal volumetrics router
+├── meg_analysis.py              # Artifact detection, spike detection, frequency bands
+├── routers/
+│   ├── bids_events.py           # BIDS *_events.tsv parse endpoint
+│   └── meg_source_estimate.py   # Minimum-norm MEG source estimate endpoint
+└── download_models.py           # SynthSeg ONNX model download helper
 ```

@@ -13,12 +13,14 @@
  *   • Channel visibility (checkboxes, select-all / none per type)
  */
 
-import { type FC, useState } from 'react';
+import { type FC, useState, useCallback, type DragEvent } from 'react';
 import type { PluginControlsProps } from '../../types/plugin.types';
 import { useMegContext } from './MegViewer';
 import { groupByType } from '../../services/megApi';
+import { bidsEventsApi } from '../../services/bidsEventsApi';
 import FrequencyDashboard from '../../components/FrequencyDashboard';
 import MegTopomap from '../../components/MegTopomap';
+import { BAND_COLORS, BAND_LABELS, BAND_ORDER } from '../../lib/meg/bandPower';
 
 // ── Reusable slider row ───────────────────────────────────────────────────────
 
@@ -60,8 +62,36 @@ const MegControls: FC<PluginControlsProps> = () => {
     artifacts, spikes, artifactsLoading, spikesLoading,
     artifactsDone, spikesDone, artifactsError, spikesError,
     detectArtifacts, detectSpikes,
+    events, setEvents,
+    bandTintEnabled, setBandTintEnabled,
   } = useMegContext();
-  const [activeType, setActiveType] = useState<string>('mag');
+  const [activeType,    setActiveType]    = useState<string>('mag');
+  const [tsvLoading,    setTsvLoading]    = useState(false);
+  const [tsvError,      setTsvError]      = useState<string | null>(null);
+  const [tsvFilename,   setTsvFilename]   = useState<string | null>(null);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+
+  const handleTsvDragOver  = useCallback((e: DragEvent<HTMLDivElement>) => { e.preventDefault(); setIsDraggingOver(true); }, []);
+  const handleTsvDragLeave = useCallback(() => setIsDraggingOver(false), []);
+  const handleTsvDrop = useCallback(async (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDraggingOver(false);
+    const file = e.dataTransfer.files[0];
+    if (!file || !file.name.toLowerCase().endsWith('.tsv')) {
+      setTsvError('Please drop a BIDS *_events.tsv file.');
+      return;
+    }
+    setTsvLoading(true); setTsvError(null);
+    try {
+      const result = await bidsEventsApi.uploadEventsFile(file);
+      setEvents(result.events);
+      setTsvFilename(file.name);
+    } catch (err) {
+      setTsvError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTsvLoading(false);
+    }
+  }, [setEvents]);
 
   const hasData    = payload !== null;
   const duration   = payload?.totalDuration ?? 0;
@@ -101,6 +131,38 @@ const MegControls: FC<PluginControlsProps> = () => {
 
   return (
     <>
+      {/* ── BIDS Events ──────────────────────────────────────────────────── */}
+      <section className="control-section">
+        <h3 className="section-title">BIDS Events</h3>
+        <div
+          className={`tsv-dropzone${isDraggingOver ? ' tsv-dropzone--over' : ''}`}
+          onDragOver={handleTsvDragOver}
+          onDragLeave={handleTsvDragLeave}
+          onDrop={handleTsvDrop}
+          aria-label="Drop BIDS events.tsv here"
+        >
+          {tsvLoading ? (
+            <span className="tsv-dropzone__label">Parsing…</span>
+          ) : tsvFilename ? (
+            <span className="tsv-dropzone__label tsv-dropzone__label--loaded">
+              ✓ {tsvFilename}
+            </span>
+          ) : (
+            <span className="tsv-dropzone__label">Drop *_events.tsv</span>
+          )}
+        </div>
+        {tsvError && (
+          <p style={{ color: 'var(--accent-red, #ff4d4f)', fontSize: 10, marginTop: 4 }}>
+            {tsvError}
+          </p>
+        )}
+        {events.length > 0 && (
+          <p style={{ fontSize: 10, color: '#9a9ab8', marginTop: 4 }}>
+            {events.length} events · {[...new Set(events.map((e) => e.trialType))].join(', ')}
+          </p>
+        )}
+      </section>
+
       {/* ── Time window ──────────────────────────────────────────────────── */}
       <section className="control-section">
         <h3 className="section-title">Time Window</h3>
@@ -207,6 +269,44 @@ const MegControls: FC<PluginControlsProps> = () => {
           format={(v) => `${v} px`}
           onChange={(v) => setControls({ laneHeightPx: v })}
         />
+      </section>
+
+      {/* ── Band Tint ────────────────────────────────────────────────────── */}
+      {/* Paints each lane background with its sliding-window dominant frequency
+          band colour so the user can see exactly where one oscillation ends and
+          the next begins.  Toggle off for a clean waveform-only view. */}
+      <section className="control-section">
+        <h3 className="section-title">Lane Background Tint</h3>
+        <button
+          className={`btn ${bandTintEnabled ? 'btn--primary' : 'btn--secondary'}`}
+          disabled={!hasData}
+          onClick={() => setBandTintEnabled(!bandTintEnabled)}
+          style={{ width: '100%', marginBottom: 6 }}
+          title="Colour each channel lane with the dominant frequency band at each time point"
+        >
+          {bandTintEnabled ? 'Tint: ON' : 'Tint: OFF'}
+        </button>
+        {/* Band colour legend */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {BAND_ORDER.map((band) => (
+            <div key={band} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span
+                style={{
+                  display:      'inline-block',
+                  width:        10,
+                  height:       10,
+                  borderRadius: 2,
+                  background:   BAND_COLORS[band],
+                  flexShrink:   0,
+                  opacity:      0.85,
+                }}
+              />
+              <span style={{ fontSize: 9, color: '#9a9ab8', fontFamily: 'monospace' }}>
+                {BAND_LABELS[band]}
+              </span>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* ── Channel type tabs + list ──────────────────────────────────────── */}

@@ -82,6 +82,9 @@ import {
   type ComparisonContextValue,
 } from './RawComparisonContext';
 
+import { useReferencePanel } from '../../contexts/ReferencePanelContext';
+import { useSegmentationPicker } from '../../hooks/useSegmentationPicker';
+
 // ── InferenceStatus (reused by VolumetricControls for the progress UI) ────────
 
 export type InferenceStatus =
@@ -298,6 +301,34 @@ const VolumetricViewer: FC<PluginViewerProps> = ({ data, controlsSlot }) => {
   const [nNegative,               setNNegative]               = useState(0);
 
   const getVtkCtx = useCallback(() => vtkRef.current.ctx, []);
+
+  // ── Segmentation label picking → Reference Panel ───────────────────────────
+  const { navigateToRegion } = useReferencePanel();
+
+  // Stable callbacks that read mutable refs — never cause hook re-runs on render
+  const getPickerRefs = useCallback(() => ({
+    ctx:          vtkRef.current.ctx,
+    segBundle:    vtkRef.current.segBundle,
+    volumeBundle: vtkRef.current.volumeBundle,
+  }), []);
+
+  const getVolumeDims = useCallback((): [number, number, number] | null => {
+    if (!volume) return null;
+    const { dims } = volume.header;
+    const nx = dims[1]; const ny = dims[2]; const nz = dims[3];
+    if (!nx || !ny || !nz) return null;
+    return [nx, ny, nz];
+  }, [volume]);
+
+  // Clicking an MPR quadrant while a segmentation overlay is visible opens
+  // the Reference Drawer and navigates to the anatomical entry for that label.
+  useSegmentationPicker({
+    containerRef,
+    getPickerRefs,
+    getVolumeDims,
+    onLabelPick: navigateToRegion,
+    enabled:     hasOverlay,
+  });
 
   useEffect(() => {
     setCurrentTimeIndex(0);

@@ -13,8 +13,9 @@
  *   • Recording metadata (read-only)
  */
 
-import { type FC, useMemo } from 'react';
+import { type FC, useMemo, useCallback } from 'react';
 import { useTimeseriesContext } from './TimeseriesViewer';
+import { useReferencePanel } from '../../contexts/ReferencePanelContext';
 import type { PluginControlsProps } from '../../types/plugin.types';
 
 // ── Reusable slider row ───────────────────────────────────────────────────────
@@ -51,8 +52,27 @@ function SliderRow({ label, value, min, max, step = 1, disabled, format, onChang
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+// ── Frequency band quick-nav descriptors ──────────────────────────────────────
+
+const FREQ_BANDS = [
+  { id: 'delta', label: 'δ', title: 'Delta  0.5 – 4 Hz'   },
+  { id: 'theta', label: 'θ', title: 'Theta  4 – 8 Hz'     },
+  { id: 'alpha', label: 'α', title: 'Alpha  8 – 13 Hz'    },
+  { id: 'beta',  label: 'β', title: 'Beta  13 – 30 Hz'    },
+  { id: 'gamma', label: 'γ', title: 'Gamma  30 – 100 Hz'  },
+] as const;
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 const TimeseriesControls: FC<PluginControlsProps> = () => {
   const { payload, controls, setControls, totalDuration } = useTimeseriesContext();
+  const { openDrawer, setActiveTab } = useReferencePanel();
+
+  // Opens the Reference Drawer on the electrophysiology tab
+  const openElectrophysiology = useCallback(() => {
+    openDrawer();
+    setActiveTab('electrophysiology');
+  }, [openDrawer, setActiveTab]);
 
   const hasData = payload !== null;
   const windowWidth = controls.timeEnd - controls.timeStart;
@@ -170,6 +190,31 @@ const TimeseriesControls: FC<PluginControlsProps> = () => {
             <span className="channel-list__empty">No data loaded</span>
           )}
         </div>
+      </section>
+
+      {/* ── Electrophysiology Reference ─────────────────────────────────── */}
+      <section className="control-section">
+        <h3 className="section-title">EEG / MEG Reference</h3>
+        {/* Frequency band badges — click to jump to electrophysiology tab */}
+        <div className="ts-freq-badges">
+          {FREQ_BANDS.map((band) => (
+            <button
+              key={band.id}
+              className="ts-freq-badge"
+              title={band.title}
+              onClick={openElectrophysiology}
+            >
+              {band.label}
+            </button>
+          ))}
+        </div>
+        <button
+          className="btn btn--secondary btn--sm"
+          style={{ width: '100%', marginTop: 6 }}
+          onClick={openElectrophysiology}
+        >
+          📖 Open ERP / HRF Reference
+        </button>
       </section>
 
       {/* ── Metadata ───────────────────────────────────────────────────── */}

@@ -3,10 +3,11 @@
  * ──────────────────────────────────────────────────
  *
  * Manages:
- *   • Plugin registration (volumetric, timeseries, nirs)
+ *   • Plugin registration (volumetric, timeseries, nirs, meg, eeg, multimodal)
  *   • File routing via BidsRouter → ModalityRegistry → plugin.processFile()
  *   • Active plugin + parsed data state
  *   • Layout: header + plugin workspace (viewer canvas + sidebar controls)
+ *   • Global ReferencePanelProvider so ALL view modes can access the drawer
  *
  * The sidebar layout is owned by each plugin's ViewerComponent (via the
  * `controlsSlot` prop pattern), which allows ControlsComponents to be
@@ -28,8 +29,11 @@ import timeseriesPlugin from './plugins/timeseries/index';
 import nirsPlugin       from './plugins/nirs/index';
 import megPlugin        from './plugins/meg/index';
 import eegPlugin        from './plugins/eeg/index';
+import multimodalPlugin from './plugins/multimodal/index';
 
-import FileUpload from './components/FileUpload';
+import FileUpload      from './components/FileUpload';
+import ReferenceDrawer from './components/ReferenceDrawer';
+import { ReferencePanelProvider, useReferencePanel } from './contexts/ReferencePanelContext';
 
 import type { PluginData, NeuroimagingPlugin } from './types/plugin.types';
 
@@ -41,6 +45,7 @@ try { registerPlugin(timeseriesPlugin); } catch { /* already registered */ }
 try { registerPlugin(nirsPlugin);       } catch { /* already registered */ }
 try { registerPlugin(megPlugin);        } catch { /* already registered */ }
 try { registerPlugin(eegPlugin);        } catch { /* already registered */ }
+try { registerPlugin(multimodalPlugin); } catch { /* already registered */ }
 
 // ── App state ─────────────────────────────────────────────────────────────────
 
@@ -56,10 +61,12 @@ const INITIAL_STATE: AppState = {
   plugin: null, data: null, loading: false, error: null, filename: '',
 };
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Inner component — consumes ReferencePanelContext ──────────────────────────
+// Separated from App() so useReferencePanel() can be called inside the provider.
 
-export default function App() {
+function AppContent() {
   const [state, setState] = useState<AppState>(INITIAL_STATE);
+  const { toggleDrawer, isOpen: refDrawerOpen } = useReferencePanel();
 
   const handleFiles = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
@@ -150,6 +157,15 @@ export default function App() {
         <span className="app-header__badge">
           {plugin ? plugin.name : 'Multi-modal neuroimaging platform'}
         </span>
+        {/* Global reference panel toggle — accessible from every view mode */}
+        <button
+          className={`ref-toggle-btn${refDrawerOpen ? ' ref-toggle-btn--active' : ''}`}
+          onClick={toggleDrawer}
+          title="Open / close Contextual Reference Panel (biological dictionary)"
+          aria-pressed={refDrawerOpen}
+        >
+          📖 Reference
+        </button>
       </header>
 
       {/* ── Main content ────────────────────────────────────────────────── */}
@@ -183,6 +199,22 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* ── Global Reference Drawer — fixed overlay, visible from any view ── */}
+      <ReferenceDrawer />
     </div>
+  );
+}
+
+// ── Root export ───────────────────────────────────────────────────────────────
+// ReferencePanelProvider sits at the very root so navigateToRegion() and
+// openDrawer() are callable from VolumetricViewer, TimeseriesControls, and
+// any other descendant without additional context nesting.
+
+export default function App() {
+  return (
+    <ReferencePanelProvider>
+      <AppContent />
+    </ReferencePanelProvider>
   );
 }

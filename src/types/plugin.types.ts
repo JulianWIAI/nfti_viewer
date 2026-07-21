@@ -18,6 +18,7 @@ import type { TimeseriesPayload, NirsViewerControls, TimeseriesViewerControls, S
 import type { ViewerControls, SliceMaxima } from './nifti.types';
 import type { MegSessionPayload } from './meg.types';
 import type { EegSessionPayload } from './eeg.types';
+import type { FmriPayload } from './fmri.types';
 
 // ── Generic plugin data union ─────────────────────────────────────────────────
 
@@ -27,6 +28,7 @@ import type { EegSessionPayload } from './eeg.types';
  */
 export type PluginData =
   | { kind: 'volumetric'; payload: VolumePayload }
+  | { kind: 'fmri';       payload: FmriPayload }
   | { kind: 'timeseries'; payload: TimeseriesPayload }
   | { kind: 'nirs';       payload: SnirfPayload }
   | { kind: 'meg';        payload: MegSessionPayload }
